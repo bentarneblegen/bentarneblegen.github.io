@@ -1,0 +1,2056 @@
+<!DOCTYPE html>
+<html lang="nb" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Sjakkstudio – analyse, sjakknøtter og bot-spill</title>
+<style>
+:root{--bg:#312e2b;--panel:#262421;--panel2:#1f1d1b;--line:#3c3a37;--text:#fff;--muted:#bab9b8;--green:#81b64c;--green-d:#45753c;--light:#ebecd0;--dark:#739552;--hl:rgba(255,255,51,.45);--anim:450ms;--sel:rgba(20,85,30,.5);color-scheme:dark}
+body.theme-brown{--light:#f0d9b5;--dark:#b58863}
+body.theme-blue{--light:#dee3e6;--dark:#8ca2ad}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;font-size:14px}
+button{font:inherit;cursor:pointer}
+.top{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--panel2);border-bottom:1px solid #000;position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.logo{font-weight:800;font-size:20px;letter-spacing:.3px;margin-inline-end:16px;display:flex;align-items:center;gap:6px}
+.logo span.k{color:var(--green);font-size:26px}
+.nav{display:flex;gap:4px;flex-wrap:wrap}
+.nav button{background:transparent;border:0;color:var(--muted);padding:8px 14px;border-radius:6px;font-weight:700;font-size:15px}
+.nav button:hover{background:#3a3734;color:#fff}
+.nav button.active{background:#3a3734;color:#fff;box-shadow:inset 0 -3px 0 var(--green)}
+.status{margin-inline-start:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{font-size:12px;padding:4px 10px;border-radius:20px;background:#3a3734;color:var(--muted);white-space:nowrap}
+.pill.ok{background:#2e4a22;color:#b9e08f}.pill.warn{background:#5a4417;color:#f7d27a}.pill.off{background:#4a2222;color:#f2a3a3}
+.layout{display:flex;gap:20px;padding:16px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+.board-area{display:flex;flex-direction:column;gap:6px;width:min(92vw,calc(100vh - 150px),760px);min-width:280px}
+.player-bar{display:flex;align-items:center;gap:10px;height:36px;padding:0 4px;padding-inline-start:34px}
+.avatar{width:32px;height:32px;border-radius:4px;background:#575451;display:flex;align-items:center;justify-content:center;font-size:20px}
+.pname{font-weight:700}.prating{color:var(--muted);font-weight:400}
+.captured-list{color:var(--muted);font-size:15px;letter-spacing:-2px}
+.board-row{display:flex;gap:8px;align-items:stretch}
+.evalbar{width:26px;flex:0 0 26px;background:#403d39;border-radius:3px;position:relative;overflow:hidden;display:flex;flex-direction:column-reverse}
+.evalbar.flipped{flex-direction:column}
+.evalbar .fill{background:#fff;width:100%;height:50%;transition:height .6s ease}
+.evalbar .lbl{position:absolute;inset-inline:0;text-align:center;font-size:10px;font-weight:800;padding:3px 0}
+.evalbar .lbl.at-bottom{bottom:0;color:#333}.evalbar .lbl.at-top{top:0;color:#fff}
+.evalbar.hidden-bar{visibility:hidden}
+.board-wrap{flex:1;position:relative}
+.board{position:relative;width:100%;aspect-ratio:1/1;border-radius:3px;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none;box-shadow:0 4px 18px rgba(0,0,0,.45)}
+.squares{position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr)}
+.sq{position:relative}
+.sq.l{background:var(--light)}.sq.d{background:var(--dark)}
+.sq .hl{position:absolute;inset:0}
+.sq.last .hl{background:var(--hl)}
+.sq.selected .hl{background:rgba(255,255,51,.55)}
+.sq.check .hl{background:radial-gradient(circle,rgba(255,0,0,.95) 0%,rgba(231,0,0,.6) 30%,rgba(169,0,0,0) 72%)}
+.sq.hint .hl{background:rgba(80,160,255,.55)}
+.sq.wrong .hl{background:rgba(220,40,40,.55)}
+.sq.right .hl{background:rgba(129,182,76,.65)}
+.sq .dot{position:absolute;left:50%;top:50%;width:30%;height:30%;margin:-15% 0 0 -15%;border-radius:50%;background:rgba(0,0,0,.16)}
+.sq .ring{position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 0 calc(var(--sqpx,80px)*.08) rgba(0,0,0,.16)}
+.sq .coord{position:absolute;font-size:calc(var(--sqpx,80px)*.17);font-weight:700;pointer-events:none}
+.sq .coord.r{top:3%;left:5%}.sq .coord.f{bottom:2%;right:6%}
+.sq.l .coord{color:var(--dark)}.sq.d .coord{color:var(--light)}
+body.nocoords .coord{display:none}
+.pieces{position:absolute;inset:0;pointer-events:none}
+.piece{position:absolute;left:0;top:0;width:12.5%;height:12.5%;display:flex;align-items:center;justify-content:center;font-size:calc(var(--sqpx,80px)*.8);line-height:1;transition:transform var(--anim) cubic-bezier(.3,.7,.3,1),opacity calc(var(--anim)*.6) ease;will-change:transform;font-family:"Segoe UI Symbol","Noto Sans Symbols2","DejaVu Sans","Arial Unicode MS",serif;z-index:2}
+.piece.w{color:#fff;-webkit-text-stroke:calc(var(--sqpx,80px)*.022) #2b2b2b;text-shadow:0 calc(var(--sqpx,80px)*.03) 0 rgba(0,0,0,.25)}
+.piece.b{color:#2e2b28;-webkit-text-stroke:calc(var(--sqpx,80px)*.012) #000;text-shadow:0 calc(var(--sqpx,80px)*.03) 0 rgba(0,0,0,.2)}
+.piece.moving{z-index:5}
+.piece.dragging{transition:none;z-index:10;transform-origin:center;scale:1.12;cursor:grabbing}
+.piece.fade{opacity:0;transition-delay:calc(var(--anim)*.55)}
+.piece.appear{animation:appear calc(var(--anim)*.8) ease}
+@keyframes appear{from{opacity:0;scale:.6}to{opacity:1;scale:1}}
+.arrows{position:absolute;inset:0;pointer-events:none;z-index:6}
+.badges{position:absolute;inset:0;pointer-events:none;z-index:7}
+.badge{position:absolute;width:12.5%;height:12.5%}
+.badge i{position:absolute;right:-6%;top:-6%;width:40%;height:40%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:900;color:#fff;font-size:calc(var(--sqpx,80px)*.2);box-shadow:0 2px 3px rgba(0,0,0,.4);animation:pop .35s ease}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.promo{position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:20;display:flex;align-items:center;justify-content:center;gap:8px}
+.promo button{width:16%;aspect-ratio:1;border-radius:50%;border:0;background:#eee;font-size:calc(var(--sqpx,80px)*.75);font-family:"Segoe UI Symbol","Noto Sans Symbols2","DejaVu Sans",serif;line-height:1}
+.promo button:hover{background:var(--green);color:#fff}
+.overlay-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:25;background:rgba(38,36,33,.96);border-radius:10px;padding:22px 26px;text-align:center;min-width:60%;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.overlay-msg h2{margin:0 0 6px;font-size:26px}
+.overlay-msg p{color:var(--muted);margin:0 0 14px}
+.panel{width:430px;max-width:96vw;background:var(--panel);border-radius:8px;display:flex;flex-direction:column;min-height:min(80vh,820px);max-height:calc(100vh - 100px);overflow:hidden}
+.tab{display:none;flex-direction:column;height:100%;overflow:auto;padding:14px;gap:12px}
+.tab.active{display:flex}
+h3{margin:0;font-size:16px}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.btn{background:#3a3734;color:#fff;border:0;border-radius:6px;padding:9px 14px;font-weight:700;box-shadow:0 3px 0 #1c1b19}
+.btn:hover{background:#45423e}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #1c1b19}
+.btn.primary{background:var(--green);box-shadow:0 4px 0 var(--green-d);font-size:16px}
+.btn.primary:hover{background:#95c95e}
+.btn.danger{background:#7a2e2a;box-shadow:0 3px 0 #4a1a17}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+textarea,select,input[type=text],input[type=number]{background:var(--panel2);color:#fff;border:1px solid var(--line);border-radius:6px;padding:8px;font:inherit}
+textarea{width:100%;min-height:110px;resize:vertical;font-family:Consolas,monospace;font-size:12px}
+.card{background:var(--panel2);border-radius:8px;padding:12px}
+.opening{display:flex;gap:8px;align-items:center;background:var(--panel2);border-radius:8px;padding:8px 12px}
+.opening .eco{background:#a88865;color:#fff;font-weight:800;border-radius:4px;padding:2px 6px;font-size:12px}
+.moves{display:grid;grid-template-columns:42px 1fr 1fr;background:var(--panel2);border-radius:8px;overflow:auto;max-height:300px;min-height:80px;align-content:start}
+.moves .num{color:var(--muted);padding:5px 8px;background:#262421}
+.moves .mv{padding:4px 8px;cursor:pointer;border-radius:3px;display:flex;align-items:center;gap:6px;font-weight:600}
+.moves .mv:hover{background:#3a3734}
+.moves .mv.cur{background:#4b4847}
+.ic{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:10px;font-weight:900;color:#fff;flex:0 0 18px}
+.navbar{display:flex;gap:6px}
+.navbar .btn{flex:1;font-size:18px;padding:6px}
+.progress{height:8px;background:#3a3734;border-radius:4px;overflow:hidden}
+.progress>div{height:100%;width:0;background:var(--green);transition:width .3s}
+.acc{display:flex;gap:10px}
+.acc .box{flex:1;text-align:center;border-radius:8px;padding:10px;background:var(--panel2)}
+.acc .box b{display:block;font-size:26px}
+.acc .box.w b{color:#fff}.acc .box.b b{color:#ddd}
+.ctable{width:100%;border-collapse:collapse;font-size:13px}
+.ctable td{padding:4px 6px}
+.ctable td.n{text-align:center;font-weight:800;width:56px}
+.comment{display:flex;gap:10px;align-items:flex-start;background:var(--panel2);border-radius:8px;padding:10px 12px;min-height:58px}
+.comment .big{width:30px;height:30px;font-size:14px;flex:0 0 30px}
+.comment .txt b{font-size:15px}
+.graph{width:100%;height:90px;background:#3a3734;border-radius:6px;cursor:pointer;display:block}
+.bots{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.bot{background:var(--panel2);border:2px solid transparent;border-radius:8px;padding:10px 8px;text-align:center;cursor:pointer;color:#fff}
+.bot:hover{border-color:#555}
+.bot.sel{border-color:var(--green);background:#2c3a22}
+.bot .face{font-size:30px}.bot .nm{font-weight:800;margin-top:4px}.bot .rt{color:var(--muted);font-size:12px}
+.seg{display:flex;background:var(--panel2);border-radius:8px;padding:3px}
+.seg button{flex:1;background:transparent;border:0;color:var(--muted);padding:8px;border-radius:6px;font-weight:700}
+.seg button.sel{background:#3a3734;color:#fff}
+input[type=range]{width:100%;accent-color:var(--green)}
+.big-rating{font-size:44px;font-weight:900;line-height:1}
+.delta{font-weight:800;margin-inline-start:8px;font-size:18px}
+.delta.up{color:var(--green)}.delta.down{color:#e5544a}
+.pz-status{border-radius:8px;padding:14px;font-weight:700;font-size:16px;display:flex;align-items:center;gap:10px}
+.pz-status.todo{background:#3a3734}.pz-status.ok{background:#2e4a22}.pz-status.bad{background:#5a2522}
+.dots{display:flex;gap:4px;flex-wrap:wrap}
+.dots span{width:16px;height:16px;border-radius:3px;display:inline-block}
+.stat{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line)}
+.switch{display:flex;align-items:center;gap:8px;cursor:pointer}
+.kbd{background:#3a3734;border-radius:4px;padding:1px 6px;font-size:12px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1a18;border:1px solid #444;color:#fff;padding:10px 18px;border-radius:8px;z-index:100;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+.thinking{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.2}}
+a{color:#9fd16a}
+@media (max-width:1100px){.panel{width:min(760px,96vw);min-height:0;max-height:none}.board-area{width:min(96vw,760px)}}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark}}
+
+.nojs-msg{display:block;max-width:720px;margin:20px auto;padding:18px 20px;background:#4a3a17;border:1px solid #8a6d2a;border-radius:10px;line-height:1.5}
+.nojs-msg h2{margin:0 0 8px;font-size:20px}
+html.js-ok .nojs-msg{display:none}
+html.js-err .nojs-msg{display:block}
+@media (max-width:700px){.top{position:static;padding:6px 8px}.logo{font-size:17px;margin-inline-end:4px}.nav button{padding:6px 8px;font-size:13px}.status{margin-inline-start:0;width:100%}.layout{padding:8px;gap:10px}.board-area{width:96vw}.player-bar{padding-inline-start:30px;height:30px}.evalbar{width:20px;flex-basis:20px}.panel{width:96vw}.tab{padding:10px}}
+
+</style>
+<script>
+window.__jsErr=function(m){try{document.documentElement.className+=' js-err';var e=document.getElementById('jserr');if(e)e.textContent='Teknisk feil: '+m;var h=document.querySelector('#nojs h2');if(h)h.textContent='Appen stoppet på grunn av en feil';}catch(x){}};
+window.addEventListener('error',function(ev){if(!document.documentElement.classList.contains('js-ok'))window.__jsErr((ev.message||'ukjent')+(ev.lineno?' (linje '+ev.lineno+')':''));});
+
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="logo"><span class="k">&#9822;</span> Sjakkstudio</div>
+  <nav class="nav">
+    <button data-tab="analyse">&#128269; Analyse</button>
+    <button data-tab="puzzle">&#129513; Sjakknøtter</button>
+    <button data-tab="play">&#9876; Spill mot bot</button>
+    <button data-tab="settings">&#9881; Innstillinger</button>
+  </nav>
+  <div class="status"><span id="net-pill" class="pill">…</span><span id="engine-pill" class="pill">Laster motor…</span></div>
+</header>
+<div id="nojs" class="nojs-msg">
+  <h2>Appen har ikke startet</h2>
+  <p>Denne visningen kjører ikke JavaScript, så sjakkbrettet, analysen, nøttene og botene kan ikke lastes. Det skjer typisk i forhåndsvisningen i OneDrive-, Teams- eller Filer-appen på mobil.</p>
+  <p><b>Android:</b> Last ned fila og åpne den med Chrome.<br><b>iPhone/iPad:</b> Safari kan ikke åpne lokale HTML-filer. Legg fila på en nettadresse (f.eks. GitHub Pages eller Netlify Drop) og åpne lenken i Safari – da fungerer også offline-lagringen.<br><b>PC/Mac:</b> Dobbeltklikk fila slik at den åpnes i Edge eller Chrome.</p>
+  <p id="jserr" class="small"></p>
+</div>
+<noscript><style>.nojs-msg{display:block!important}</style></noscript>
+<main class="layout">
+  <section class="board-area">
+    <div class="player-bar" id="topBar"></div>
+    <div class="board-row">
+      <div class="evalbar" id="evalbar"><div class="fill"></div><span class="lbl"></span></div>
+      <div class="board-wrap"><div id="board" class="board"></div></div>
+    </div>
+    <div class="player-bar" id="botBar"></div>
+  </section>
+  <aside class="panel">
+    <div class="tab" id="tab-analyse">
+      <h3>Partianalyse</h3>
+      <textarea id="an-pgn" placeholder="Lim inn PGN fra et parti du har spilt (f.eks. fra chess.com eller lichess)…" spellcheck="false"></textarea>
+      <div class="row">
+        <button class="btn" id="an-load">Last inn</button>
+        <button class="btn primary grow" id="an-run">Analyser partiet</button>
+      </div>
+      <div class="row small">
+        <label class="muted">Dybde</label>
+        <select id="an-depth"><option value="fast">Rask</option><option value="normal">Normal</option><option value="deep">Grundig</option></select>
+        <button class="btn" id="an-example">Eksempelparti</button>
+        <label class="btn" style="padding:7px 12px">Åpne .pgn-fil<input type="file" id="an-file" accept=".pgn,.txt" style="display:none"></label>
+      </div>
+      <div class="progress"><div id="an-progress"></div></div>
+      <div class="small muted" id="an-status"></div>
+      <div class="opening" id="an-opening"><span class="muted">Ingen åpning ennå</span></div>
+      <div class="comment" id="an-comment"></div>
+      <div class="navbar">
+        <button class="btn" id="an-first" title="Start (Home)">&#9198;</button>
+        <button class="btn" id="an-prev" title="Forrige (←)">&#9664;</button>
+        <button class="btn" id="an-next" title="Neste (→)">&#9654;</button>
+        <button class="btn" id="an-last" title="Slutt (End)">&#9197;</button>
+        <button class="btn" id="an-flip" title="Snu brettet">&#8645;</button>
+      </div>
+      <button class="btn" id="an-back" style="display:none">&#8617; Tilbake til partiet</button>
+      <svg id="an-graph" class="graph" viewBox="0 0 400 90" preserveAspectRatio="none"></svg>
+      <div class="moves" id="an-moves"></div>
+      <div id="an-summary" class="card" style="display:none"></div>
+      <div class="small muted">Tips: Du kan også flytte brikker på brettet for å utforske egne varianter. Bruk <span class="kbd">←</span> <span class="kbd">→</span> for å bla.</div>
+    </div>
+    <div class="tab" id="tab-puzzle">
+      <div class="card">
+        <div class="small muted">Din nøtterating</div>
+        <div><span class="big-rating" id="pz-rating">800</span><span id="pz-delta" class="delta"></span></div>
+        <svg id="pz-spark" viewBox="0 0 300 50" preserveAspectRatio="none" style="width:100%;height:46px;margin-top:6px"></svg>
+      </div>
+      <div class="card">
+        <div class="stat"><span>Nøttens rating</span><b id="pz-prating">–</b></div>
+        <div class="stat"><span>Tema</span><span id="pz-themes" class="muted small"></span></div>
+        <div class="stat"><span>Neste nøtter rundt</span><b id="pz-target">–</b></div>
+      </div>
+      <div class="pz-status todo" id="pz-status">Laster nøtt…</div>
+      <div class="row">
+        <button class="btn" id="pz-hint" title="Hint teller som ikke løst">&#128161; Hint</button>
+        <button class="btn" id="pz-sol">Vis løsning</button>
+        <button class="btn" id="pz-retry">Prøv igjen</button>
+      </div>
+      <button class="btn primary" id="pz-next">Neste nøtt &#10140;</button>
+      <div class="card">
+        <div class="stat"><span>Løst</span><b id="pz-solved">0</b></div>
+        <div class="stat"><span>Rekke på rad</span><b id="pz-streak">0</b></div>
+        <div style="margin-top:8px" class="small muted">Siste resultater</div>
+        <div class="dots" id="pz-dots" style="margin-top:6px"></div>
+      </div>
+      <div class="small muted">Nøttene tilpasser seg nivået ditt automatisk. Klarer du en nøtt, går ratingen din opp og neste nøtt blir vanskeligere. Klarer du den ikke, går både ratingen og vanskelighetsgraden ned – men bare halvparten så mye, så det går raskere fremover enn bakover. <span id="pz-total"></span> nøtter er innebygd og virker offline.</div>
+    </div>
+    <div class="tab" id="tab-play">
+      <div id="pl-setup" style="display:flex;flex-direction:column;gap:12px">
+        <h3>Velg motstander</h3>
+        <div class="bots" id="pl-bots"></div>
+        <div class="card">
+          <div class="row"><span>Egendefinert styrke</span><span class="grow"></span><b id="pl-rv">1200</b></div>
+          <input type="range" id="pl-range" min="250" max="3200" step="50" value="1200">
+          <div class="small muted" id="pl-desc"></div>
+        </div>
+        <div class="seg" id="pl-color"><button data-c="w">&#9817; Hvit</button><button data-c="r">&#127922; Tilfeldig</button><button data-c="b">&#9823; Svart</button></div>
+        <button class="btn primary" id="pl-start">Spill</button>
+        <div class="small muted">Botene drives av Stockfish når den er tilgjengelig (lagres for offline-bruk), ellers av den innebygde motoren. Styrken justeres med søkedybde og hvor ofte boten velger svakere trekk.</div>
+      </div>
+      <div id="pl-game" style="display:none;flex-direction:column;gap:12px">
+        <div class="pz-status todo" id="pl-status"></div>
+        <div class="opening" id="pl-opening"></div>
+        <div class="moves" id="pl-moves"></div>
+        <label class="switch"><input type="checkbox" id="pl-eval"> Vis evalueringsbar under partiet</label>
+        <div class="row">
+          <button class="btn" id="pl-undo">&#8630; Angre</button>
+          <button class="btn" id="pl-hint">&#128161; Hint</button>
+          <button class="btn" id="pl-flip">&#8645; Snu</button>
+          <button class="btn danger" id="pl-resign">Gi opp</button>
+        </div>
+        <div class="row">
+          <button class="btn grow" id="pl-analyze">Analyser partiet</button>
+          <button class="btn grow" id="pl-new">Ny kamp</button>
+        </div>
+      </div>
+    </div>
+    <div class="tab" id="tab-settings">
+      <h3>Innstillinger</h3>
+      <div class="card">
+        <div class="row"><span>Animasjonshastighet</span><span class="grow"></span><b id="st-anim-v"></b></div>
+        <input type="range" id="st-anim" min="100" max="1200" step="50">
+        <div class="small muted">Hvor lang tid en brikke bruker fra felt til felt.</div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;gap:8px">
+        <label class="switch"><input type="checkbox" id="st-sound"> Lyd ved trekk</label>
+        <label class="switch"><input type="checkbox" id="st-coords"> Vis koordinater</label>
+        <div class="seg" id="st-theme"><button data-t="green">Grønt brett</button><button data-t="brown">Brunt</button><button data-t="blue">Blått</button></div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;gap:8px">
+        <b>Sjakkmotor og offline-modus</b>
+        <div class="small" id="st-engine"></div>
+        <div class="seg" id="st-eng"><button data-e="auto">Stockfish (anbefalt)</button><button data-e="internal">Kun innebygd motor</button></div>
+        <button class="btn" id="st-dl">Last ned / oppdater Stockfish for offline</button>
+        <div class="small muted">Hele appen ligger i én fil og virker uten nett. Stockfish hentes én gang når du er tilkoblet og lagres i nettleseren. Uten nett og uten lagret Stockfish brukes den innebygde motoren automatisk.</div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;gap:8px">
+        <b>Dine data</b>
+        <div class="small" id="st-storage"></div>
+        <div class="row"><button class="btn" id="st-export">Eksporter data</button><label class="btn">Importer data<input type="file" id="st-import" accept=".json" style="display:none"></label><button class="btn danger" id="st-reset">Nullstill nøtterating</button></div>
+        <div class="small muted" id="st-counts"></div>
+      </div>
+    </div>
+  </aside>
+</main>
+<div class="toast" id="toast"></div>
+
+<script id="core-src">
+/* ===== Sjakkregler (0x88) ===== */
+var Chess = (function () {
+  var P = 1, N = 2, B = 3, R = 4, Q = 5, K = 6;
+  var N_OFF = [-33, -31, -18, -14, 14, 18, 31, 33];
+  var B_OFF = [-17, -15, 15, 17];
+  var R_OFF = [-16, -1, 1, 16];
+  var K_OFF = [-17, -16, -15, -1, 1, 15, 16, 17];
+  var START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  var PCH = ' pnbrqk';
+  var F_CAP = 1, F_EP = 2, F_CASTLE = 4, F_DOUBLE = 8, F_PROMO = 16;
+  var seed = 0x2545F491;
+  function rnd() { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return seed >>> 0; }
+  var ZL = [], ZH = [];
+  for (var i = 0; i < 16; i++) { ZL.push(new Uint32Array(128)); ZH.push(new Uint32Array(128)); for (var j = 0; j < 128; j++) { ZL[i][j] = rnd(); ZH[i][j] = rnd(); } }
+  var ZCL = new Uint32Array(16), ZCH = new Uint32Array(16); for (i = 0; i < 16; i++) { ZCL[i] = rnd(); ZCH[i] = rnd(); }
+  var ZEL = new Uint32Array(8), ZEH = new Uint32Array(8); for (i = 0; i < 8; i++) { ZEL[i] = rnd(); ZEH[i] = rnd(); }
+  var ZSL = rnd(), ZSH = rnd();
+  // castling mask per square
+  var CMASK = new Uint8Array(128); for (i = 0; i < 128; i++) CMASK[i] = 15;
+  CMASK[0x74] = 15 & ~3; CMASK[0x77] = 15 & ~1; CMASK[0x70] = 15 & ~2;
+  CMASK[0x04] = 15 & ~12; CMASK[0x07] = 15 & ~4; CMASK[0x00] = 15 & ~8;
+
+  function sqName(s) { return 'abcdefgh'[s & 7] + (8 - (s >> 4)); }
+  function sqIdx(n) { return (8 - parseInt(n[1], 10)) * 16 + (n.charCodeAt(0) - 97); }
+  function mFrom(m) { return m & 127; }
+  function mTo(m) { return (m >> 7) & 127; }
+  function mPromo(m) { return (m >> 14) & 7; }
+  function mFlags(m) { return (m >> 17) & 31; }
+  function mk(f, t, pr, fl) { return f | (t << 7) | (pr << 14) | (fl << 17); }
+
+  function Pos(fen) { this.b = new Int8Array(128); this.load(fen || START); }
+  var PP = Pos.prototype;
+  PP.load = function (fen) {
+    var b = this.b; b.fill(0);
+    var parts = fen.trim().split(/\s+/), rows = parts[0].split('/');
+    if (rows.length !== 8) throw new Error('Ugyldig FEN');
+    this.kings = [-1, -1];
+    for (var r = 0; r < 8; r++) {
+      var c = 0;
+      for (var k = 0; k < rows[r].length; k++) {
+        var ch = rows[r][k];
+        if (ch >= '1' && ch <= '8') { c += +ch; continue; }
+        var lo = ch.toLowerCase(), t = PCH.indexOf(lo);
+        if (t < 1) throw new Error('Ugyldig FEN');
+        var p = t + (ch === lo ? 8 : 0), s = r * 16 + c;
+        b[s] = p; if (t === K) this.kings[ch === lo ? 1 : 0] = s; c++;
+      }
+    }
+    if (this.kings[0] < 0 || this.kings[1] < 0) throw new Error('Ugyldig FEN: mangler konge');
+    this.turn = parts[1] === 'b' ? 1 : 0;
+    var cs = parts[2] || '-'; this.castle = 0;
+    if (cs.indexOf('K') >= 0 && b[0x74] === K && b[0x77] === R) this.castle |= 1;
+    if (cs.indexOf('Q') >= 0 && b[0x74] === K && b[0x70] === R) this.castle |= 2;
+    if (cs.indexOf('k') >= 0 && b[0x04] === K + 8 && b[0x07] === R + 8) this.castle |= 4;
+    if (cs.indexOf('q') >= 0 && b[0x04] === K + 8 && b[0x00] === R + 8) this.castle |= 8;
+    this.ep = (parts[3] && parts[3] !== '-') ? sqIdx(parts[3]) : -1;
+    this.half = parseInt(parts[4] || '0', 10) || 0;
+    this.full = parseInt(parts[5] || '1', 10) || 1;
+    this.stack = [];
+    this.rehash();
+  };
+  PP.rehash = function () {
+    var lo = 0, hi = 0;
+    for (var s = 0; s < 128; s++) { if (s & 0x88) { s += 7; continue; } var p = this.b[s]; if (p) { lo ^= ZL[p][s]; hi ^= ZH[p][s]; } }
+    lo ^= ZCL[this.castle]; hi ^= ZCH[this.castle];
+    if (this.ep >= 0) { lo ^= ZEL[this.ep & 7]; hi ^= ZEH[this.ep & 7]; }
+    if (this.turn) { lo ^= ZSL; hi ^= ZSH; }
+    this.hl = lo >>> 0; this.hh = hi >>> 0;
+  };
+  PP.clone = function () { var p = new Pos(this.fen()); return p; };
+  PP.fen = function () {
+    var out = '';
+    for (var r = 0; r < 8; r++) {
+      var e = 0;
+      for (var c = 0; c < 8; c++) {
+        var p = this.b[r * 16 + c];
+        if (!p) { e++; continue; }
+        if (e) { out += e; e = 0; }
+        var ch = PCH[p & 7]; out += p > 8 ? ch : ch.toUpperCase();
+      }
+      if (e) out += e; if (r < 7) out += '/';
+    }
+    var cs = (this.castle & 1 ? 'K' : '') + (this.castle & 2 ? 'Q' : '') + (this.castle & 4 ? 'k' : '') + (this.castle & 8 ? 'q' : '');
+    return out + ' ' + (this.turn ? 'b' : 'w') + ' ' + (cs || '-') + ' ' + (this.ep >= 0 ? sqName(this.ep) : '-') + ' ' + this.half + ' ' + this.full;
+  };
+  PP.key = function () { return this.fen().split(' ').slice(0, 4).join(' '); };
+  PP.attacked = function (s, by) {
+    var b = this.b, t, i, d, x, add = by ? 8 : 0;
+    if (by === 0) { x = s + 15; if (!(x & 0x88) && b[x] === P) return true; x = s + 17; if (!(x & 0x88) && b[x] === P) return true; }
+    else { x = s - 15; if (!(x & 0x88) && b[x] === P + 8) return true; x = s - 17; if (!(x & 0x88) && b[x] === P + 8) return true; }
+    for (i = 0; i < 8; i++) { x = s + N_OFF[i]; if (!(x & 0x88) && b[x] === N + add) return true; }
+    for (i = 0; i < 8; i++) { x = s + K_OFF[i]; if (!(x & 0x88) && b[x] === K + add) return true; }
+    for (i = 0; i < 4; i++) { d = B_OFF[i]; x = s + d; while (!(x & 0x88)) { t = b[x]; if (t) { if (t === B + add || t === Q + add) return true; break; } x += d; } }
+    for (i = 0; i < 4; i++) { d = R_OFF[i]; x = s + d; while (!(x & 0x88)) { t = b[x]; if (t) { if (t === R + add || t === Q + add) return true; break; } x += d; } }
+    return false;
+  };
+  PP.inCheck = function (side) { if (side === undefined) side = this.turn; return this.attacked(this.kings[side], side ^ 1); };
+  // pseudo-legal generation
+  PP.gen = function (capsOnly) {
+    var b = this.b, us = this.turn, them = us ^ 1, out = [], s, p, t, i, d, x, q;
+    var add = us ? 8 : 0;
+    for (s = 0; s < 128; s++) {
+      if (s & 0x88) { s += 7; continue; }
+      p = b[s]; if (!p || (p > 8) !== (us === 1)) continue;
+      t = p & 7;
+      if (t === P) {
+        var dir = us ? 16 : -16, startRow = us ? 1 : 6, promoRow = us ? 7 : 0;
+        x = s + dir;
+        if (!(x & 0x88) && !b[x]) {
+          if ((x >> 4) === promoRow) { for (q = Q; q >= N; q--) out.push(mk(s, x, q, F_PROMO)); }
+          else if (!capsOnly) {
+            out.push(mk(s, x, 0, 0));
+            var x2 = x + dir; if ((s >> 4) === startRow && !b[x2]) out.push(mk(s, x2, 0, F_DOUBLE));
+          }
+        }
+        for (i = -1; i <= 1; i += 2) {
+          x = s + dir + i; if (x & 0x88) continue;
+          var tp = b[x];
+          if (tp && (tp > 8) !== (us === 1)) {
+            if ((x >> 4) === promoRow) { for (q = Q; q >= N; q--) out.push(mk(s, x, q, F_PROMO | F_CAP)); }
+            else out.push(mk(s, x, 0, F_CAP));
+          } else if (x === this.ep) out.push(mk(s, x, 0, F_CAP | F_EP));
+        }
+      } else if (t === N || t === K) {
+        var offs = t === N ? N_OFF : K_OFF;
+        for (i = 0; i < 8; i++) {
+          x = s + offs[i]; if (x & 0x88) continue;
+          var tq = b[x];
+          if (!tq) { if (!capsOnly) out.push(mk(s, x, 0, 0)); }
+          else if ((tq > 8) !== (us === 1)) out.push(mk(s, x, 0, F_CAP));
+        }
+        if (t === K && !capsOnly) {
+          if (us === 0 && s === 0x74) {
+            if ((this.castle & 1) && !b[0x75] && !b[0x76] && b[0x77] === R && !this.attacked(0x74, 1) && !this.attacked(0x75, 1) && !this.attacked(0x76, 1)) out.push(mk(s, 0x76, 0, F_CASTLE));
+            if ((this.castle & 2) && !b[0x73] && !b[0x72] && !b[0x71] && b[0x70] === R && !this.attacked(0x74, 1) && !this.attacked(0x73, 1) && !this.attacked(0x72, 1)) out.push(mk(s, 0x72, 0, F_CASTLE));
+          } else if (us === 1 && s === 0x04) {
+            if ((this.castle & 4) && !b[0x05] && !b[0x06] && b[0x07] === R + 8 && !this.attacked(0x04, 0) && !this.attacked(0x05, 0) && !this.attacked(0x06, 0)) out.push(mk(s, 0x06, 0, F_CASTLE));
+            if ((this.castle & 8) && !b[0x03] && !b[0x02] && !b[0x01] && b[0x00] === R + 8 && !this.attacked(0x04, 0) && !this.attacked(0x03, 0) && !this.attacked(0x02, 0)) out.push(mk(s, 0x02, 0, F_CASTLE));
+          }
+        }
+      } else {
+        var dirs = t === B ? B_OFF : t === R ? R_OFF : K_OFF;
+        for (i = 0; i < dirs.length; i++) {
+          d = dirs[i]; x = s + d;
+          while (!(x & 0x88)) {
+            var tz = b[x];
+            if (!tz) { if (!capsOnly) out.push(mk(s, x, 0, 0)); }
+            else { if ((tz > 8) !== (us === 1)) out.push(mk(s, x, 0, F_CAP)); break; }
+            x += d;
+          }
+        }
+      }
+    }
+    return out;
+  };
+  PP.make = function (m) {
+    var b = this.b, f = mFrom(m), t = mTo(m), fl = mFlags(m), p = b[f], us = this.turn;
+    var cap = (fl & F_EP) ? b[t + (us ? -16 : 16)] : b[t];
+    this.stack.push({ m: m, cap: cap, castle: this.castle, ep: this.ep, half: this.half, hl: this.hl, hh: this.hh });
+    var lo = this.hl ^ ZCL[this.castle], hi = this.hh ^ ZCH[this.castle];
+    if (this.ep >= 0) { lo ^= ZEL[this.ep & 7]; hi ^= ZEH[this.ep & 7]; }
+    if (fl & F_EP) { var cs = t + (us ? -16 : 16); b[cs] = 0; lo ^= ZL[cap][cs]; hi ^= ZH[cap][cs]; }
+    else if (cap) { lo ^= ZL[cap][t]; hi ^= ZH[cap][t]; }
+    lo ^= ZL[p][f]; hi ^= ZH[p][f];
+    b[f] = 0;
+    var np = (fl & F_PROMO) ? mPromo(m) + (us ? 8 : 0) : p;
+    b[t] = np; lo ^= ZL[np][t]; hi ^= ZH[np][t];
+    if ((p & 7) === K) this.kings[us] = t;
+    if (fl & F_CASTLE) {
+      var rf, rt;
+      if (t === 0x76) { rf = 0x77; rt = 0x75; } else if (t === 0x72) { rf = 0x70; rt = 0x73; }
+      else if (t === 0x06) { rf = 0x07; rt = 0x05; } else { rf = 0x00; rt = 0x03; }
+      var rp = b[rf]; b[rf] = 0; b[rt] = rp; lo ^= ZL[rp][rf] ^ ZL[rp][rt]; hi ^= ZH[rp][rf] ^ ZH[rp][rt];
+    }
+    this.castle &= CMASK[f] & CMASK[t];
+    this.ep = (fl & F_DOUBLE) ? f + (us ? 16 : -16) : -1;
+    lo ^= ZCL[this.castle]; hi ^= ZCH[this.castle];
+    if (this.ep >= 0) { lo ^= ZEL[this.ep & 7]; hi ^= ZEH[this.ep & 7]; }
+    this.half = ((p & 7) === P || cap) ? 0 : this.half + 1;
+    if (us === 1) this.full++;
+    this.turn ^= 1; lo ^= ZSL; hi ^= ZSH;
+    this.hl = lo >>> 0; this.hh = hi >>> 0;
+  };
+  PP.unmake = function () {
+    var u = this.stack.pop(), m = u.m, b = this.b, f = mFrom(m), t = mTo(m), fl = mFlags(m);
+    this.turn ^= 1; var us = this.turn;
+    var p = b[t]; if (fl & F_PROMO) p = P + (us ? 8 : 0);
+    b[f] = p; b[t] = 0;
+    if (fl & F_EP) b[t + (us ? -16 : 16)] = u.cap; else b[t] = u.cap;
+    if ((p & 7) === K) this.kings[us] = f;
+    if (fl & F_CASTLE) {
+      var rf, rt;
+      if (t === 0x76) { rf = 0x77; rt = 0x75; } else if (t === 0x72) { rf = 0x70; rt = 0x73; }
+      else if (t === 0x06) { rf = 0x07; rt = 0x05; } else { rf = 0x00; rt = 0x03; }
+      b[rf] = b[rt]; b[rt] = 0;
+    }
+    if (us === 1) this.full--;
+    this.castle = u.castle; this.ep = u.ep; this.half = u.half; this.hl = u.hl; this.hh = u.hh;
+  };
+  PP.nullMove = function () {
+    this.stack.push({ m: 0, nul: 1, ep: this.ep, hl: this.hl, hh: this.hh, half: this.half, castle: this.castle });
+    var lo = this.hl, hi = this.hh;
+    if (this.ep >= 0) { lo ^= ZEL[this.ep & 7]; hi ^= ZEH[this.ep & 7]; }
+    this.ep = -1; this.turn ^= 1; lo ^= ZSL; hi ^= ZSH; this.hl = lo >>> 0; this.hh = hi >>> 0; this.half++;
+  };
+  PP.unNull = function () { var u = this.stack.pop(); this.turn ^= 1; this.ep = u.ep; this.hl = u.hl; this.hh = u.hh; this.half = u.half; };
+  PP.legal = function () {
+    var ms = this.gen(false), out = [], us = this.turn;
+    for (var i = 0; i < ms.length; i++) { this.make(ms[i]); if (!this.attacked(this.kings[us], us ^ 1)) out.push(ms[i]); this.unmake(); }
+    return out;
+  };
+  PP.uci = function (m) { return sqName(mFrom(m)) + sqName(mTo(m)) + (mPromo(m) ? PCH[mPromo(m)] : ''); };
+  PP.fromUci = function (u) {
+    if (!u || u.length < 4) return 0;
+    var f = sqIdx(u.slice(0, 2)), t = sqIdx(u.slice(2, 4)), pr = u.length > 4 ? PCH.indexOf(u[4].toLowerCase()) : 0;
+    var ms = this.legal();
+    for (var i = 0; i < ms.length; i++) if (mFrom(ms[i]) === f && mTo(ms[i]) === t && mPromo(ms[i]) === pr) return ms[i];
+    return 0;
+  };
+  PP.san = function (m, legalList) {
+    var b = this.b, f = mFrom(m), t = mTo(m), fl = mFlags(m), p = b[f], tp = p & 7, s;
+    if (fl & F_CASTLE) s = (t & 7) === 6 ? 'O-O' : 'O-O-O';
+    else {
+      s = '';
+      if (tp === P) { if (fl & F_CAP) s = 'abcdefgh'[f & 7] + 'x'; s += sqName(t); if (fl & F_PROMO) s += '=' + PCH[mPromo(m)].toUpperCase(); }
+      else {
+        s = PCH[tp].toUpperCase();
+        var ms = legalList || this.legal(), sameF = false, sameR = false, amb = false;
+        for (var i = 0; i < ms.length; i++) {
+          var o = ms[i]; if (o === m) continue;
+          if (mTo(o) === t && b[mFrom(o)] === p) { amb = true; if ((mFrom(o) & 7) === (f & 7)) sameF = true; if ((mFrom(o) >> 4) === (f >> 4)) sameR = true; }
+        }
+        if (amb) { if (!sameF) s += 'abcdefgh'[f & 7]; else if (!sameR) s += (8 - (f >> 4)); else s += sqName(f); }
+        if (fl & F_CAP) s += 'x'; s += sqName(t);
+      }
+    }
+    this.make(m);
+    if (this.inCheck()) s += this.legal().length ? '+' : '#';
+    this.unmake();
+    return s;
+  };
+  PP.fromSan = function (san) {
+    var clean = san.replace(/[+#!?]+$/g, '').replace(/^0-0-0/, 'O-O-O').replace(/^0-0/, 'O-O').replace(/e\.p\.$/, '').trim();
+    var ms = this.legal(), i;
+    for (i = 0; i < ms.length; i++) if (this.san(ms[i], ms).replace(/[+#]/g, '') === clean) return ms[i];
+    // tolerant: missing '=' in promotion, superfluous disambiguation
+    var m2 = clean.replace(/([a-h][18])([QRBN])$/, '$1=$2');
+    for (i = 0; i < ms.length; i++) if (this.san(ms[i], ms).replace(/[+#]/g, '') === m2) return ms[i];
+    var mm = /^([NBRQK])?([a-h])?([1-8])?x?([a-h][1-8])(=?[QRBN])?$/.exec(clean);
+    if (mm) {
+      var cands = [];
+      for (i = 0; i < ms.length; i++) {
+        var m = ms[i], pc = this.b[mFrom(m)] & 7;
+        if ((mm[1] ? PCH.indexOf(mm[1].toLowerCase()) : P) !== pc) continue;
+        if (sqName(mTo(m)) !== mm[4]) continue;
+        if (mm[2] && 'abcdefgh'[mFrom(m) & 7] !== mm[2]) continue;
+        if (mm[3] && String(8 - (mFrom(m) >> 4)) !== mm[3]) continue;
+        var pr = mm[5] ? PCH.indexOf(mm[5].replace('=', '').toLowerCase()) : 0;
+        if (mPromo(m) !== pr) continue;
+        cands.push(m);
+      }
+      if (cands.length === 1) return cands[0];
+    }
+    return 0;
+  };
+  PP.insufficient = function () {
+    var minors = 0, bishopsColor = [], b = this.b;
+    for (var s = 0; s < 128; s++) {
+      if (s & 0x88) { s += 7; continue; }
+      var t = b[s] & 7; if (!t || t === K) continue;
+      if (t === P || t === R || t === Q) return false;
+      minors++; if (t === B) bishopsColor.push(((s >> 4) + (s & 7)) & 1);
+    }
+    if (minors <= 1) return true;
+    if (minors === bishopsColor.length) { for (var i = 1; i < bishopsColor.length; i++) if (bishopsColor[i] !== bishopsColor[0]) return false; return true; }
+    return false;
+  };
+  PP.pieceAt = function (name) { var p = this.b[sqIdx(name)]; if (!p) return null; return { type: PCH[p & 7], color: p > 8 ? 'b' : 'w' }; };
+  PP.board = function () { // array of 64 entries a8..h1
+    var out = [];
+    for (var r = 0; r < 8; r++) for (var c = 0; c < 8; c++) { var p = this.b[r * 16 + c]; out.push(p ? (p > 8 ? 'b' : 'w') + PCH[p & 7] : null); }
+    return out;
+  };
+
+  /* ===== Game wrapper ===== */
+  function Game(fen) {
+    this.startFen = fen || START; this.pos = new Pos(this.startFen);
+    this.moves = []; // {san, uci, fen, from, to}
+    this.hist = [this.pos.hl + ':' + this.pos.hh];
+    this.headers = {};
+  }
+  var GP = Game.prototype;
+  GP.fen = function () { return this.pos.fen(); };
+  GP.turn = function () { return this.pos.turn ? 'b' : 'w'; };
+  GP.legalMoves = function () {
+    var p = this.pos, ms = p.legal();
+    return ms.map(function (m) { return { from: sqName(mFrom(m)), to: sqName(mTo(m)), promo: mPromo(m) ? PCH[mPromo(m)] : null, uci: p.uci(m), m: m }; });
+  };
+  GP._push = function (m) {
+    var p = this.pos, ms = p.legal(), san = p.san(m, ms), uci = p.uci(m);
+    var rec = { san: san, uci: uci, from: sqName(mFrom(m)), to: sqName(mTo(m)), fenBefore: p.fen(), color: p.turn ? 'b' : 'w', capture: !!(mFlags(m) & F_CAP), castle: !!(mFlags(m) & F_CASTLE) };
+    p.make(m); p.stack.length = 0;
+    rec.fen = p.fen(); this.moves.push(rec); this.hist.push(p.hl + ':' + p.hh);
+    return rec;
+  };
+  GP.moveUci = function (u) { var m = this.pos.fromUci(u); return m ? this._push(m) : null; };
+  GP.moveSan = function (s) { var m = this.pos.fromSan(s); return m ? this._push(m) : null; };
+  GP.undo = function () {
+    if (!this.moves.length) return null;
+    var last = this.moves.pop(); this.hist.pop(); this.pos = new Pos(last.fenBefore); return last;
+  };
+  GP.inCheck = function () { return this.pos.inCheck(); };
+  GP.status = function () {
+    var n = this.pos.legal().length;
+    if (!n) return this.pos.inCheck() ? { over: true, result: this.pos.turn ? '1-0' : '0-1', reason: 'sjakkmatt' } : { over: true, result: '1/2-1/2', reason: 'patt' };
+    if (this.pos.insufficient()) return { over: true, result: '1/2-1/2', reason: 'utilstrekkelig materiale' };
+    if (this.pos.half >= 100) return { over: true, result: '1/2-1/2', reason: '50-trekksregelen' };
+    var cur = this.hist[this.hist.length - 1], cnt = 0;
+    for (var i = 0; i < this.hist.length; i++) if (this.hist[i] === cur) cnt++;
+    if (cnt >= 3) return { over: true, result: '1/2-1/2', reason: 'trekkgjentakelse' };
+    return { over: false };
+  };
+  GP.pgn = function (result) {
+    var h = this.headers, out = '';
+    var keys = Object.keys(h); for (var i = 0; i < keys.length; i++) out += '[' + keys[i] + ' "' + h[keys[i]] + '"]\n';
+    if (this.startFen !== START) out += '[SetUp "1"]\n[FEN "' + this.startFen + '"]\n';
+    if (keys.length) out += '\n';
+    var p = new Pos(this.startFen), num = p.full, t = p.turn, s = '';
+    for (i = 0; i < this.moves.length; i++) {
+      if (t === 0) s += num + '. '; else if (i === 0) s += num + '... ';
+      s += this.moves[i].san + ' '; if (t === 1) num++; t ^= 1;
+    }
+    return out + s + (result || h.Result || '*');
+  };
+  function parsePgn(text) {
+    text = text.replace(/\r/g, '').replace(/^\uFEFF/, '');
+    var headers = {}, re = /\[\s*(\w+)\s+"((?:[^"\\]|\\.)*)"\s*\]/g, m;
+    while ((m = re.exec(text))) headers[m[1]] = m[2];
+    var body = text.replace(/\[\s*\w+\s+"(?:[^"\\]|\\.)*"\s*\]/g, ' ');
+    body = body.replace(/\{[^}]*\}/g, ' ').replace(/;[^\n]*/g, ' ');
+    var prev; do { prev = body; body = body.replace(/\([^()]*\)/g, ' '); } while (body !== prev);
+    body = body.replace(/\$\d+/g, ' ').replace(/\d+\.(\.\.)?/g, ' ').replace(/\.\.\./g, ' ');
+    var toks = body.split(/\s+/).filter(function (x) { return x && !/^(1-0|0-1|1\/2-1\/2|\*)$/.test(x); });
+    var startFen = headers.FEN || START;
+    var g = new Game(startFen); g.headers = headers;
+    for (var i = 0; i < toks.length; i++) {
+      var tok = toks[i].replace(/^\d+\./, ''); if (!tok) continue;
+      if (!g.moveSan(tok)) throw new Error('Ugyldig trekk «' + toks[i] + '» (trekk nr. ' + (Math.floor(g.moves.length / 2) + 1) + ')');
+    }
+    return g;
+  }
+  function perft(pos, d) { if (!d) return 1; var ms = pos.gen(false), n = 0, us = pos.turn; for (var i = 0; i < ms.length; i++) { pos.make(ms[i]); if (!pos.attacked(pos.kings[us], us ^ 1)) n += perft(pos, d - 1); pos.unmake(); } return n; }
+  return { Pos: Pos, Game: Game, parsePgn: parsePgn, START: START, sqName: sqName, sqIdx: sqIdx, mFrom: mFrom, mTo: mTo, mPromo: mPromo, mFlags: mFlags, mk: mk, F_CAP: F_CAP, F_EP: F_EP, F_CASTLE: F_CASTLE, F_PROMO: F_PROMO, F_DOUBLE: F_DOUBLE, perft: perft, PCH: PCH };
+})();
+if (typeof module !== 'undefined') module.exports = Chess;
+
+/* ===== Innebygd motor (alpha-beta, UCI-delsett) ===== */
+var MiniEngine = (function (C) {
+  var P = 1, N = 2, B = 3, R = 4, Q = 5, K = 6;
+  var VAL = [0, 100, 320, 330, 500, 900, 0];
+  var PST = [null,
+    [0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0],
+    [-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],
+    [-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],
+    [0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0],
+    [-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
+    [-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20]];
+  var KEG = [-50,-40,-30,-20,-20,-30,-40,-50,-30,-20,-10,0,0,-10,-20,-30,-30,-10,20,30,30,20,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,20,30,30,20,-10,-30,-30,-30,0,0,0,0,-30,-30,-50,-30,-30,-30,-30,-30,-30,-50];
+  var PASSED = [0, 120, 80, 50, 30, 15, 10, 0]; // by row index for white (row 1 = 7th rank)
+  var MATE = 30000, INF = 32000;
+  function idx64(s, white) { var r = s >> 4, c = s & 7; return white ? r * 8 + c : (7 - r) * 8 + c; }
+
+  function evaluate(pos) {
+    var b = pos.b, mg = [0, 0], eg = [0, 0], phase = 0, s, p, t, col, i;
+    var pawnsF = [new Int8Array(8), new Int8Array(8)], bishops = [0, 0], mat = [0, 0], pcs = [0, 0];
+    var pawnRows = [[], []];
+    for (s = 0; s < 128; s++) {
+      if (s & 0x88) { s += 7; continue; }
+      p = b[s]; if (!p) continue;
+      t = p & 7; col = p > 8 ? 1 : 0;
+      var ix = idx64(s, col === 0);
+      if (t === K) { mg[col] += PST[K][ix]; eg[col] += KEG[ix]; continue; }
+      mg[col] += VAL[t] + PST[t][ix]; eg[col] += VAL[t] + (t === P ? PST[t][ix] >> 1 : PST[t][ix]);
+      mat[col] += VAL[t];
+      if (t === P) { pawnsF[col][s & 7]++; pawnRows[col].push(s); }
+      else { pcs[col]++; phase += t === Q ? 4 : t === R ? 2 : 1; }
+      if (t === B) bishops[col]++;
+    }
+    for (col = 0; col < 2; col++) {
+      if (bishops[col] >= 2) { mg[col] += 30; eg[col] += 50; }
+      var my = pawnsF[col], op = pawnsF[col ^ 1];
+      for (var f = 0; f < 8; f++) {
+        if (my[f] > 1) { mg[col] -= 10 * (my[f] - 1); eg[col] -= 20 * (my[f] - 1); }
+        if (my[f] && !(f > 0 && my[f - 1]) && !(f < 7 && my[f + 1])) { mg[col] -= 10; eg[col] -= 15; }
+      }
+      // passed pawns
+      for (i = 0; i < pawnRows[col].length; i++) {
+        s = pawnRows[col][i]; var r = s >> 4, c = s & 7, passed = true;
+        for (var dc = -1; dc <= 1 && passed; dc++) {
+          var cc = c + dc; if (cc < 0 || cc > 7) continue;
+          if (col === 0) { for (var rr = r - 1; rr >= 1; rr--) if (b[rr * 16 + cc] === P + 8) { passed = false; break; } }
+          else { for (rr = r + 1; rr <= 6; rr++) if (b[rr * 16 + cc] === P) { passed = false; break; } }
+        }
+        if (passed) { var rowIdx = col === 0 ? r : 7 - r; mg[col] += PASSED[rowIdx] >> 1; eg[col] += PASSED[rowIdx]; }
+      }
+    }
+    // rooks on open files
+    for (s = 0; s < 128; s++) {
+      if (s & 0x88) { s += 7; continue; }
+      p = b[s]; if ((p & 7) !== R) continue; col = p > 8 ? 1 : 0;
+      var fl = s & 7;
+      if (!pawnsF[col][fl]) { mg[col] += pawnsF[col ^ 1][fl] ? 10 : 20; eg[col] += 10; }
+    }
+    if (phase > 24) phase = 24;
+    var mgS = mg[0] - mg[1], egS = eg[0] - eg[1];
+    // mop-up: drive lone king to edge
+    for (col = 0; col < 2; col++) {
+      if (pcs[col ^ 1] === 0 && pawnRows[col ^ 1].length === 0 && mat[col] >= 500) {
+        var ek = pos.kings[col ^ 1], mk2 = pos.kings[col];
+        var er = ek >> 4, ec = ek & 7, cd = Math.max(3 - er, er - 4) + Math.max(3 - ec, ec - 4);
+        var kd = Math.abs((mk2 >> 4) - er) + Math.abs((mk2 & 7) - ec);
+        var bonus = 10 * cd + 4 * (14 - kd) + 200;
+        egS += col === 0 ? bonus : -bonus;
+      }
+    }
+    var sc = ((mgS * phase + egS * (24 - phase)) / 24) | 0;
+    // drawish material
+    if (mat[0] < 400 && pawnRows[0].length === 0 && sc > 0) sc >>= 3;
+    if (mat[1] < 400 && pawnRows[1].length === 0 && sc < 0) sc >>= 3;
+    sc += pos.turn === 0 ? 10 : -10;
+    return pos.turn === 0 ? sc : -sc;
+  }
+
+  function Searcher() {
+    this.ttSize = 1 << 20; this.ttMask = this.ttSize - 1;
+    this.ttKey = new Uint32Array(this.ttSize); this.ttMove = new Int32Array(this.ttSize);
+    this.ttScore = new Int16Array(this.ttSize); this.ttDepth = new Int8Array(this.ttSize); this.ttFlag = new Uint8Array(this.ttSize);
+    this.history = new Int32Array(128 * 128); this.killers = [];
+    for (var i = 0; i < 128; i++) this.killers.push([0, 0]);
+  }
+  var SP = Searcher.prototype;
+  SP.clearTT = function () { this.ttKey.fill(0); this.ttMove.fill(0); this.history.fill(0); };
+  SP.order = function (pos, ms, ttm, ply) {
+    var b = pos.b, sc = new Array(ms.length), k = this.killers[ply] || [0, 0];
+    for (var i = 0; i < ms.length; i++) {
+      var m = ms[i], s;
+      if (m === ttm) s = 1e7;
+      else if (C.mFlags(m) & C.F_CAP) { var vic = (C.mFlags(m) & C.F_EP) ? 1 : b[C.mTo(m)] & 7; s = 1e6 + VAL[vic] * 10 - VAL[b[C.mFrom(m)] & 7] / 10; }
+      else if (C.mFlags(m) & C.F_PROMO) s = 9e5 + C.mPromo(m);
+      else if (m === k[0]) s = 8e5; else if (m === k[1]) s = 7e5;
+      else s = this.history[C.mFrom(m) * 128 + C.mTo(m)];
+      sc[i] = s;
+    }
+    var idx = ms.map(function (_, i) { return i; }).sort(function (a, c) { return sc[c] - sc[a]; });
+    return idx.map(function (i) { return ms[i]; });
+  };
+  SP.timeUp = function () {
+    if ((this.nodes & 2047) === 0 && this.deadline && Date.now() > this.deadline) this.stopped = true;
+    return this.stopped;
+  };
+  SP.qs = function (pos, alpha, beta, ply) {
+    this.nodes++; if (this.timeUp()) return 0;
+    var stand = evaluate(pos);
+    if (ply > 60) return stand;
+    if (stand >= beta) return stand;
+    if (stand > alpha) alpha = stand;
+    var ms = this.order(pos, pos.gen(true), 0, ply), us = pos.turn;
+    for (var i = 0; i < ms.length; i++) {
+      var m = ms[i];
+      if (!(C.mFlags(m) & C.F_PROMO)) { var vic = (C.mFlags(m) & C.F_EP) ? 1 : pos.b[C.mTo(m)] & 7; if (stand + VAL[vic] + 200 < alpha) continue; }
+      pos.make(m);
+      if (pos.attacked(pos.kings[us], us ^ 1)) { pos.unmake(); continue; }
+      var s = -this.qs(pos, -beta, -alpha, ply + 1);
+      pos.unmake();
+      if (this.stopped) return 0;
+      if (s >= beta) return s;
+      if (s > alpha) alpha = s;
+    }
+    return alpha;
+  };
+  SP.isRep = function (pos) {
+    var st = pos.stack, n = st.length;
+    for (var i = n - 2; i >= 0 && i >= n - pos.half - 1; i -= 2) if (st[i].hl === pos.hl && st[i].hh === pos.hh) return true;
+    for (i = 0; i < this.gameHist.length; i++) if (this.gameHist[i] === pos.hl + ':' + pos.hh) return true;
+    return false;
+  };
+  SP.search = function (pos, depth, alpha, beta, ply, canNull, excl) {
+    if (ply > 0) {
+      if (pos.half >= 100 || this.isRep(pos)) return 0;
+      // mate distance pruning
+      var ma = -MATE + ply, mb = MATE - ply - 1;
+      if (ma > alpha) alpha = ma; if (mb < beta) beta = mb; if (alpha >= beta) return alpha;
+    }
+    var inChk = pos.inCheck();
+    if (inChk) depth++;
+    if (depth <= 0) return this.qs(pos, alpha, beta, ply);
+    this.nodes++; if (this.timeUp()) return 0;
+    var ti = pos.hl & this.ttMask, ttm = 0, pvNode = beta - alpha > 1;
+    if (this.ttKey[ti] === pos.hh) {
+      ttm = this.ttMove[ti];
+      if (ply > 0 && this.ttDepth[ti] >= depth && !pvNode) {
+        var ts = this.ttScore[ti], tf = this.ttFlag[ti];
+        if (ts > MATE - 200) ts -= ply; else if (ts < -MATE + 200) ts += ply;
+        if (tf === 0 || (tf === 1 && ts >= beta) || (tf === 2 && ts <= alpha)) return ts;
+      }
+    }
+    var us = pos.turn;
+    if (canNull && !inChk && !pvNode && depth >= 3 && ply > 0) {
+      var hasPiece = false, b = pos.b;
+      for (var s2 = 0; s2 < 128 && !hasPiece; s2++) { if (s2 & 0x88) { s2 += 7; continue; } var pp = b[s2]; if (pp && (pp > 8 ? 1 : 0) === us && (pp & 7) > 1 && (pp & 7) < 6) hasPiece = true; }
+      if (hasPiece && evaluate(pos) >= beta) {
+        pos.nullMove();
+        var ns = -this.search(pos, depth - 3, -beta, -beta + 1, ply + 1, false);
+        pos.unNull();
+        if (this.stopped) return 0;
+        if (ns >= beta && ns < MATE - 200) return beta;
+      }
+    }
+    var ms = this.order(pos, pos.gen(false), ttm, ply), best = -INF, bestM = 0, legal = 0, a0 = alpha;
+    for (var i = 0; i < ms.length; i++) {
+      var m = ms[i];
+      if (excl && ply === 0 && excl.indexOf(m) >= 0) continue;
+      pos.make(m);
+      if (pos.attacked(pos.kings[us], us ^ 1)) { pos.unmake(); continue; }
+      legal++;
+      var quiet = !(C.mFlags(m) & (C.F_CAP | C.F_PROMO)), sc;
+      if (legal === 1) sc = -this.search(pos, depth - 1, -beta, -alpha, ply + 1, true);
+      else {
+        var red = 0;
+        if (depth >= 3 && legal > 3 && quiet && !inChk && !pos.inCheck()) red = legal > 8 ? 2 : 1;
+        sc = -this.search(pos, depth - 1 - red, -alpha - 1, -alpha, ply + 1, true);
+        if (sc > alpha && (red || sc < beta)) sc = -this.search(pos, depth - 1, -beta, -alpha, ply + 1, true);
+      }
+      pos.unmake();
+      if (this.stopped) return 0;
+      if (sc > best) { best = sc; bestM = m; }
+      if (sc > alpha) {
+        alpha = sc;
+        if (ply === 0) this.rootBest = m;
+        if (sc >= beta) {
+          if (quiet) { var kk = this.killers[ply]; if (kk && kk[0] !== m) { kk[1] = kk[0]; kk[0] = m; } this.history[C.mFrom(m) * 128 + C.mTo(m)] += depth * depth; }
+          break;
+        }
+      }
+    }
+    if (!legal) { if (excl && ply === 0) return -INF; return inChk ? -MATE + ply : 0; }
+    var st = best; if (st > MATE - 200) st += ply; else if (st < -MATE + 200) st -= ply;
+    if (!excl || ply > 0) {
+      this.ttKey[ti] = pos.hh; this.ttMove[ti] = bestM; this.ttScore[ti] = st; this.ttDepth[ti] = depth;
+      this.ttFlag[ti] = best >= beta ? 1 : best <= a0 ? 2 : 0;
+    }
+    return best;
+  };
+  SP.pv = function (pos, first, maxLen) {
+    var line = [first], made = 0; pos.make(first); made++;
+    var seen = {};
+    while (line.length < maxLen) {
+      var ti = pos.hl & this.ttMask; if (this.ttKey[ti] !== pos.hh) break;
+      var m = this.ttMove[ti]; if (!m || seen[pos.hl]) break; seen[pos.hl] = 1;
+      var lm = pos.legal(); if (lm.indexOf(m) < 0) break;
+      line.push(m); pos.make(m); made++;
+    }
+    var out = [];
+    while (made--) pos.unmake();
+    var p2 = pos; // rebuild uci strings
+    for (var i = 0; i < line.length; i++) { out.push(p2.uci(line[i])); p2.make(line[i]); }
+    for (i = 0; i < line.length; i++) p2.unmake();
+    return out;
+  };
+  // run iterative deepening; cb(info) per depth
+  SP.go = function (pos, opts, gameHist, onInfo) {
+    this.gameHist = gameHist || []; this.stopped = false; this.nodes = 0;
+    var start = Date.now(); this.deadline = opts.movetime ? start + opts.movetime : 0;
+    var maxD = opts.depth || 64, multi = Math.max(1, opts.multipv || 1), results = [];
+    var legal = pos.legal(); if (!legal.length) return { lines: [], best: null };
+    multi = Math.min(multi, legal.length);
+    for (var d = 1; d <= maxD; d++) {
+      var excl = [], lines = [];
+      for (var k = 0; k < multi; k++) {
+        this.rootBest = 0;
+        var sc = this.search(pos, d, -INF, INF, 0, false, k > 0 ? excl : null);
+        if (this.stopped && d > 1) break;
+        var bm = this.rootBest; if (!bm) { var cands = legal.filter(function (m) { return excl.indexOf(m) < 0; }); bm = cands[0]; }
+        excl.push(bm);
+        lines.push({ move: bm, score: sc, pv: this.pv(pos, bm, Math.min(d + 2, 16)) });
+      }
+      if (this.stopped && d > 1) break;
+      lines.sort(function (a, c) { return c.score - a.score; });
+      results = lines;
+      if (onInfo) onInfo(d, lines, this.nodes, Date.now() - start);
+      if (Math.abs(lines[0].score) > MATE - 200 && d >= 2 * (MATE - Math.abs(lines[0].score)) + 1) break;
+      if (this.deadline && Date.now() - start > (this.deadline - start) * 0.5) break;
+    }
+    return { lines: results, best: results[0] ? results[0].move : legal[0] };
+  };
+
+  // UCI-like wrapper
+  function create(send) {
+    var S = new Searcher(), pos = new C.Pos(), hist = [], multipv = 1;
+    function scoreStr(s) { if (Math.abs(s) > MATE - 200) { var n = MATE - Math.abs(s); var mv = Math.ceil(n / 2); return 'mate ' + (s > 0 ? mv : -mv); } return 'cp ' + s; }
+    function handle(cmd) {
+      cmd = String(cmd).trim(); var parts = cmd.split(/\s+/);
+      if (cmd === 'uci') { send('id name Innebygd motor'); send('uciok'); }
+      else if (cmd === 'isready') send('readyok');
+      else if (cmd === 'ucinewgame') S.clearTT();
+      else if (parts[0] === 'setoption') { var mm = /name\s+MultiPV\s+value\s+(\d+)/i.exec(cmd); if (mm) multipv = +mm[1]; }
+      else if (parts[0] === 'position') {
+        var mi = parts.indexOf('moves'), fen;
+        if (parts[1] === 'startpos') fen = C.START; else fen = parts.slice(2, mi > 0 ? mi : undefined).join(' ');
+        pos = new C.Pos(fen); hist = [];
+        if (mi > 0) for (var i = mi + 1; i < parts.length; i++) { hist.push(pos.hl + ':' + pos.hh); var m = pos.fromUci(parts[i]); if (m) { pos.make(m); pos.stack.length = 0; } }
+      }
+      else if (parts[0] === 'go') {
+        var o = { multipv: multipv };
+        var di = parts.indexOf('depth'); if (di > 0) o.depth = +parts[di + 1];
+        var ti = parts.indexOf('movetime'); if (ti > 0) o.movetime = +parts[ti + 1];
+        if (!o.depth && !o.movetime) o.movetime = 1000;
+        var r = S.go(pos, o, hist, function (d, lines, nodes, ms) {
+          for (var k = 0; k < lines.length; k++) send('info depth ' + d + ' multipv ' + (k + 1) + ' score ' + scoreStr(lines[k].score) + ' nodes ' + nodes + ' time ' + ms + ' pv ' + lines[k].pv.join(' '));
+        });
+        send('bestmove ' + (r.best ? pos.uci(r.best) : '(none)'));
+      }
+    }
+    return { postMessage: function (cmd) { setTimeout(function () { handle(cmd); }, 0); }, handleSync: handle, evaluate: function () { return evaluate(pos); } };
+  }
+  return { create: create, evaluate: evaluate, Searcher: Searcher };
+})(Chess);
+if (typeof module !== 'undefined') module.exports = MiniEngine;
+if (typeof self !== 'undefined' && typeof window === 'undefined' && typeof importScripts === 'function') {
+  (function () { var eng = MiniEngine.create(function (l) { self.postMessage(l); }); self.onmessage = function (e) { eng.handleSync(e.data); }; })();
+}
+
+</script>
+<script>
+var OPENINGS=[["A00", "Polish Opening", "b4"], ["A00", "Grob Opening", "g4"], ["A00", "Van't Kruijs Opening", "e3"], ["A00", "Mieses Opening", "d3"], ["A00", "Saragossa Opening", "c3"], ["A00", "Hungarian Opening", "g3"], ["A00", "Clemenz Opening", "h3"], ["A00", "Ware Opening", "a4"], ["A00", "Amar Opening", "Nh3"], ["A00", "Anderssen's Opening", "a3"], ["A00", "Sodium Attack", "Na3"], ["A00", "Dunst Opening", "Nc3"], ["A01", "Nimzo-Larsen Attack", "b3"], ["A01", "Nimzo-Larsen Attack: Modern Variation", "b3 e5"], ["A02", "Bird's Opening", "f4"], ["A02", "Bird's Opening: From's Gambit", "f4 e5"], ["A03", "Bird's Opening: Dutch Variation", "f4 d5"], ["A04", "Zukertort Opening", "Nf3"], ["A04", "Zukertort Opening: Sicilian Invitation", "Nf3 c5"], ["A05", "Zukertort Opening: Indian Defense", "Nf3 Nf6"], ["A06", "Zukertort Opening: Queen's Gambit Invitation", "Nf3 d5"], ["A07", "King's Indian Attack", "Nf3 d5 g3"], ["A08", "King's Indian Attack: French Variation", "e4 e6 d3 d5 Nd2"], ["A09", "Réti Opening", "Nf3 d5 c4"], ["A09", "Réti Opening: Advance Variation", "Nf3 d5 c4 d4"], ["A10", "English Opening", "c4"], ["A10", "English Opening: Great Snake Variation", "c4 g6"], ["A11", "English Opening: Caro-Kann Defensive System", "c4 c6"], ["A13", "English Opening: Agincourt Defense", "c4 e6"], ["A15", "English Opening: Anglo-Indian Defense", "c4 Nf6"], ["A16", "English Opening: Anglo-Indian Defense, Queen's Knight Variation", "c4 Nf6 Nc3"], ["A20", "English Opening: King's English Variation", "c4 e5"], ["A21", "English Opening: King's English, Reversed Sicilian", "c4 e5 Nc3"], ["A22", "English Opening: King's English, Two Knights Variation", "c4 e5 Nc3 Nf6"], ["A25", "English Opening: Closed, Reversed Closed Sicilian", "c4 e5 Nc3 Nc6"], ["A29", "English Opening: Four Knights System", "c4 e5 Nc3 Nc6 Nf3 Nf6"], ["A30", "English Opening: Symmetrical Variation", "c4 c5"], ["A34", "English Opening: Symmetrical, Three Knights", "c4 c5 Nc3"], ["A40", "Queen's Pawn Game", "d4"], ["A40", "Englund Gambit", "d4 e5"], ["A40", "Queen's Pawn Game: Modern Defense", "d4 g6"], ["A40", "Horwitz Defense", "d4 e6"], ["A41", "Queen's Pawn Game: Old Indian / Wade", "d4 d6"], ["A43", "Old Benoni Defense", "d4 c5"], ["A45", "Indian Defense", "d4 Nf6"], ["A45", "Trompowsky Attack", "d4 Nf6 Bg5"], ["A46", "Indian Defense: Knights Variation", "d4 Nf6 Nf3"], ["A46", "London System", "d4 Nf6 Nf3 e6 Bf4"], ["A48", "London System: Indian Setup", "d4 Nf6 Nf3 g6 Bf4"], ["A48", "East Indian Defense", "d4 Nf6 Nf3 g6"], ["A50", "Indian Defense: Normal Variation", "d4 Nf6 c4"], ["A51", "Budapest Gambit", "d4 Nf6 c4 e5"], ["A53", "Old Indian Defense", "d4 Nf6 c4 d6"], ["A56", "Benoni Defense", "d4 Nf6 c4 c5"], ["A57", "Benko Gambit", "d4 Nf6 c4 c5 d5 b5"], ["A60", "Modern Benoni", "d4 Nf6 c4 c5 d5 e6"], ["A80", "Dutch Defense", "d4 f5"], ["A82", "Dutch Defense: Staunton Gambit", "d4 f5 e4"], ["A84", "Dutch Defense: Normal", "d4 f5 c4 Nf6"], ["A87", "Dutch Defense: Leningrad Variation", "d4 f5 c4 Nf6 g3 g6 Bg2 Bg7 Nf3"], ["A90", "Dutch Defense: Stonewall", "d4 f5 c4 Nf6 g3 e6 Bg2 d5"], ["B00", "King's Pawn Opening", "e4"], ["B00", "Nimzowitsch Defense", "e4 Nc6"], ["B00", "Owen's Defense", "e4 b6"], ["B00", "St. George Defense", "e4 a6"], ["B01", "Scandinavian Defense", "e4 d5"], ["B01", "Scandinavian Defense: Main Line", "e4 d5 exd5 Qxd5 Nc3 Qa5"], ["B01", "Scandinavian Defense: Mieses-Kotroc Variation", "e4 d5 exd5 Qxd5"], ["B01", "Scandinavian Defense: Modern Variation", "e4 d5 exd5 Nf6"], ["B01", "Scandinavian Defense: Valencian Variation", "e4 d5 exd5 Qxd5 Nc3 Qd8"], ["B01", "Scandinavian Defense: Gubinsky-Melts Defense", "e4 d5 exd5 Qxd5 Nc3 Qd6"], ["B02", "Alekhine's Defense", "e4 Nf6"], ["B03", "Alekhine's Defense: Four Pawns Attack", "e4 Nf6 e5 Nd5 d4 d6 c4 Nb6 f4"], ["B04", "Alekhine's Defense: Modern Variation", "e4 Nf6 e5 Nd5 d4 d6 Nf3"], ["B06", "Modern Defense", "e4 g6"], ["B06", "Modern Defense: Standard Line", "e4 g6 d4 Bg7"], ["B07", "Pirc Defense", "e4 d6 d4 Nf6"], ["B07", "Pirc Defense: Classical Variation", "e4 d6 d4 Nf6 Nc3 g6 Nf3"], ["B09", "Pirc Defense: Austrian Attack", "e4 d6 d4 Nf6 Nc3 g6 f4"], ["B10", "Caro-Kann Defense", "e4 c6"], ["B10", "Caro-Kann Defense: Two Knights Attack", "e4 c6 Nc3 d5 Nf3"], ["B12", "Caro-Kann Defense: Advance Variation", "e4 c6 d4 d5 e5"], ["B12", "Caro-Kann Defense: Advance, Short Variation", "e4 c6 d4 d5 e5 Bf5 Nf3 e6 Be2"], ["B13", "Caro-Kann Defense: Exchange Variation", "e4 c6 d4 d5 exd5 cxd5"], ["B14", "Caro-Kann Defense: Panov Attack", "e4 c6 d4 d5 exd5 cxd5 c4"], ["B15", "Caro-Kann Defense", "e4 c6 d4 d5 Nc3"], ["B17", "Caro-Kann Defense: Karpov Variation", "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nd7"], ["B18", "Caro-Kann Defense: Classical Variation", "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5"], ["B20", "Sicilian Defense", "e4 c5"], ["B20", "Sicilian Defense: Wing Gambit", "e4 c5 b4"], ["B20", "Sicilian Defense: Bowdler Attack", "e4 c5 Bc4"], ["B21", "Sicilian Defense: Smith-Morra Gambit", "e4 c5 d4 cxd4 c3"], ["B21", "Sicilian Defense: Grand Prix Attack", "e4 c5 Nc3 Nc6 f4"], ["B22", "Sicilian Defense: Alapin Variation", "e4 c5 c3"], ["B23", "Sicilian Defense: Closed", "e4 c5 Nc3"], ["B27", "Sicilian Defense: Hyperaccelerated Dragon", "e4 c5 Nf3 g6"], ["B28", "Sicilian Defense: O'Kelly Variation", "e4 c5 Nf3 a6"], ["B29", "Sicilian Defense: Nimzowitsch Variation", "e4 c5 Nf3 Nf6"], ["B30", "Sicilian Defense: Old Sicilian", "e4 c5 Nf3 Nc6"], ["B30", "Sicilian Defense: Rossolimo Variation", "e4 c5 Nf3 Nc6 Bb5"], ["B32", "Sicilian Defense: Open", "e4 c5 Nf3 Nc6 d4 cxd4 Nxd4"], ["B32", "Sicilian Defense: Löwenthal Variation", "e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 e5"], ["B33", "Sicilian Defense: Sveshnikov Variation", "e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 Nf6 Nc3 e5"], ["B34", "Sicilian Defense: Accelerated Dragon", "e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 g6"], ["B40", "Sicilian Defense: French Variation", "e4 c5 Nf3 e6"], ["B41", "Sicilian Defense: Kan Variation", "e4 c5 Nf3 e6 d4 cxd4 Nxd4 a6"], ["B44", "Sicilian Defense: Taimanov Variation", "e4 c5 Nf3 e6 d4 cxd4 Nxd4 Nc6"], ["B45", "Sicilian Defense: Four Knights Variation", "e4 c5 Nf3 e6 d4 cxd4 Nxd4 Nf6 Nc3 Nc6"], ["B50", "Sicilian Defense: Modern Variations", "e4 c5 Nf3 d6"], ["B51", "Sicilian Defense: Moscow Variation", "e4 c5 Nf3 d6 Bb5+"], ["B53", "Sicilian Defense: Chekhover Variation", "e4 c5 Nf3 d6 d4 cxd4 Qxd4"], ["B54", "Sicilian Defense: Open, Modern", "e4 c5 Nf3 d6 d4 cxd4 Nxd4"], ["B56", "Sicilian Defense: Classical Variation", "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 Nc6"], ["B70", "Sicilian Defense: Dragon Variation", "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6"], ["B72", "Sicilian Defense: Dragon, Yugoslav Attack", "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6 Be3 Bg7 f3"], ["B80", "Sicilian Defense: Scheveningen Variation", "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 e6"], ["B90", "Sicilian Defense: Najdorf Variation", "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6"], ["B90", "Sicilian Defense: Najdorf, English Attack", "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Be3"], ["B92", "Sicilian Defense: Najdorf, Opocensky Variation", "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Be2"], ["B94", "Sicilian Defense: Najdorf, 6.Bg5", "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Bg5"], ["C00", "French Defense", "e4 e6"], ["C00", "French Defense: Knight Variation", "e4 e6 Nf3"], ["C00", "French Defense: Normal Variation", "e4 e6 d4 d5"], ["C01", "French Defense: Exchange Variation", "e4 e6 d4 d5 exd5 exd5"], ["C02", "French Defense: Advance Variation", "e4 e6 d4 d5 e5"], ["C03", "French Defense: Tarrasch Variation", "e4 e6 d4 d5 Nd2"], ["C10", "French Defense: Paulsen Variation", "e4 e6 d4 d5 Nc3"], ["C10", "French Defense: Rubinstein Variation", "e4 e6 d4 d5 Nc3 dxe4"], ["C11", "French Defense: Classical Variation", "e4 e6 d4 d5 Nc3 Nf6"], ["C11", "French Defense: Steinitz Variation", "e4 e6 d4 d5 Nc3 Nf6 e5"], ["C15", "French Defense: Winawer Variation", "e4 e6 d4 d5 Nc3 Bb4"], ["C18", "French Defense: Winawer, Advance Variation", "e4 e6 d4 d5 Nc3 Bb4 e5 c5 a3"], ["C20", "King's Pawn Game", "e4 e5"], ["C20", "King's Pawn Game: Wayward Queen Attack", "e4 e5 Qh5"], ["C20", "Center Game", "e4 e5 d4 exd4 Qxd4"], ["C20", "King's Pawn Game: Napoleon Attack", "e4 e5 Qf3"], ["C21", "Danish Gambit", "e4 e5 d4 exd4 c3"], ["C22", "Center Game: Normal Variation", "e4 e5 d4 exd4 Qxd4 Nc6"], ["C23", "Bishop's Opening", "e4 e5 Bc4"], ["C24", "Bishop's Opening: Berlin Defense", "e4 e5 Bc4 Nf6"], ["C25", "Vienna Game", "e4 e5 Nc3"], ["C25", "Vienna Game: Max Lange Defense", "e4 e5 Nc3 Nc6"], ["C26", "Vienna Game: Falkbeer Variation", "e4 e5 Nc3 Nf6"], ["C29", "Vienna Game: Vienna Gambit", "e4 e5 Nc3 Nf6 f4"], ["C30", "King's Gambit", "e4 e5 f4"], ["C31", "King's Gambit Declined: Falkbeer Countergambit", "e4 e5 f4 d5"], ["C30", "King's Gambit Declined: Classical Variation", "e4 e5 f4 Bc5"], ["C33", "King's Gambit Accepted", "e4 e5 f4 exf4"], ["C33", "King's Gambit Accepted: Bishop's Gambit", "e4 e5 f4 exf4 Bc4"], ["C34", "King's Gambit Accepted: King's Knight Gambit", "e4 e5 f4 exf4 Nf3"], ["C40", "King's Knight Opening", "e4 e5 Nf3"], ["C40", "Latvian Gambit", "e4 e5 Nf3 f5"], ["C40", "Elephant Gambit", "e4 e5 Nf3 d5"], ["C41", "Philidor Defense", "e4 e5 Nf3 d6"], ["C41", "Philidor Defense: Exchange Variation", "e4 e5 Nf3 d6 d4 exd4"], ["C42", "Petrov's Defense", "e4 e5 Nf3 Nf6"], ["C42", "Petrov's Defense: Classical Attack", "e4 e5 Nf3 Nf6 Nxe5 d6 Nf3 Nxe4 d4"], ["C42", "Petrov's Defense: Stafford Gambit", "e4 e5 Nf3 Nf6 Nxe5 Nc6"], ["C43", "Petrov's Defense: Steinitz Attack", "e4 e5 Nf3 Nf6 d4"], ["C44", "King's Pawn Game: Tayler Opening / Ponziani", "e4 e5 Nf3 Nc6 c3"], ["C44", "Scotch Game", "e4 e5 Nf3 Nc6 d4"], ["C44", "Scotch Gambit", "e4 e5 Nf3 Nc6 d4 exd4 Bc4"], ["C45", "Scotch Game: Classical Variation", "e4 e5 Nf3 Nc6 d4 exd4 Nxd4 Bc5"], ["C45", "Scotch Game: Schmidt Variation", "e4 e5 Nf3 Nc6 d4 exd4 Nxd4 Nf6"], ["C46", "Three Knights Opening", "e4 e5 Nf3 Nc6 Nc3"], ["C47", "Four Knights Game", "e4 e5 Nf3 Nc6 Nc3 Nf6"], ["C47", "Four Knights Game: Scotch Variation", "e4 e5 Nf3 Nc6 Nc3 Nf6 d4"], ["C48", "Four Knights Game: Spanish Variation", "e4 e5 Nf3 Nc6 Nc3 Nf6 Bb5"], ["C50", "Italian Game", "e4 e5 Nf3 Nc6 Bc4"], ["C50", "Italian Game: Hungarian Defense", "e4 e5 Nf3 Nc6 Bc4 Be7"], ["C50", "Italian Game: Giuoco Piano", "e4 e5 Nf3 Nc6 Bc4 Bc5"], ["C50", "Italian Game: Giuoco Pianissimo", "e4 e5 Nf3 Nc6 Bc4 Bc5 d3"], ["C51", "Italian Game: Evans Gambit", "e4 e5 Nf3 Nc6 Bc4 Bc5 b4"], ["C53", "Italian Game: Classical Variation", "e4 e5 Nf3 Nc6 Bc4 Bc5 c3"], ["C54", "Italian Game: Classical, Main Line", "e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d4"], ["C55", "Italian Game: Two Knights Defense", "e4 e5 Nf3 Nc6 Bc4 Nf6"], ["C55", "Italian Game: Two Knights, Modern Bishop's Opening", "e4 e5 Nf3 Nc6 Bc4 Nf6 d3"], ["C56", "Italian Game: Two Knights, Scotch Gambit", "e4 e5 Nf3 Nc6 Bc4 Nf6 d4"], ["C57", "Italian Game: Two Knights, Knight Attack", "e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5"], ["C57", "Italian Game: Two Knights, Fried Liver Attack", "e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 d5 exd5 Nxd5 Nxf7"], ["C57", "Italian Game: Two Knights, Traxler Counterattack", "e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 Bc5"], ["C58", "Italian Game: Two Knights, Polerio Defense", "e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 d5 exd5 Na5"], ["C60", "Ruy López Opening", "e4 e5 Nf3 Nc6 Bb5"], ["C60", "Ruy López Opening: Cozio Defense", "e4 e5 Nf3 Nc6 Bb5 Nge7"], ["C61", "Ruy López Opening: Bird Variation", "e4 e5 Nf3 Nc6 Bb5 Nd4"], ["C62", "Ruy López Opening: Steinitz Defense", "e4 e5 Nf3 Nc6 Bb5 d6"], ["C63", "Ruy López Opening: Schliemann Defense", "e4 e5 Nf3 Nc6 Bb5 f5"], ["C64", "Ruy López Opening: Classical Variation", "e4 e5 Nf3 Nc6 Bb5 Bc5"], ["C65", "Ruy López Opening: Berlin Defense", "e4 e5 Nf3 Nc6 Bb5 Nf6"], ["C67", "Ruy López Opening: Berlin Defense, Rio de Janeiro / Berlin Wall", "e4 e5 Nf3 Nc6 Bb5 Nf6 O-O Nxe4 d4 Nd6 Bxc6 dxc6 dxe5 Nf5 Qxd8+ Kxd8"], ["C68", "Ruy López Opening: Morphy Defense, Exchange Variation", "e4 e5 Nf3 Nc6 Bb5 a6 Bxc6"], ["C70", "Ruy López Opening: Morphy Defense", "e4 e5 Nf3 Nc6 Bb5 a6 Ba4"], ["C78", "Ruy López Opening: Morphy Defense, Normal", "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O"], ["C80", "Ruy López Opening: Open Variation", "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Nxe4"], ["C84", "Ruy López Opening: Closed Variation", "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7"], ["C88", "Ruy López Opening: Closed, Anti-Marshall", "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 O-O"], ["C89", "Ruy López Opening: Marshall Attack", "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 O-O c3 d5"], ["C92", "Ruy López Opening: Closed, Zaitsev / Main Line", "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 d6 c3 O-O h3"], ["D00", "Queen's Pawn Game: Accelerated London System", "d4 d5 Bf4"], ["D00", "Blackmar-Diemer Gambit", "d4 d5 e4"], ["D00", "Queen's Pawn Game", "d4 d5"], ["D01", "Richter-Veresov Attack", "d4 d5 Nc3 Nf6 Bg5"], ["D02", "Queen's Pawn Game: Zukertort Variation", "d4 d5 Nf3"], ["D02", "London System", "d4 d5 Nf3 Nf6 Bf4"], ["D03", "Torre Attack", "d4 d5 Nf3 Nf6 Bg5"], ["D04", "Colle System", "d4 d5 Nf3 Nf6 e3"], ["D06", "Queen's Gambit", "d4 d5 c4"], ["D06", "Queen's Gambit Refused: Baltic Defense", "d4 d5 c4 Bf5"], ["D07", "Queen's Gambit Declined: Chigorin Defense", "d4 d5 c4 Nc6"], ["D08", "Queen's Gambit Declined: Albin Countergambit", "d4 d5 c4 e5"], ["D10", "Slav Defense", "d4 d5 c4 c6"], ["D10", "Slav Defense: Exchange Variation", "d4 d5 c4 c6 cxd5 cxd5"], ["D11", "Slav Defense: Modern Line", "d4 d5 c4 c6 Nf3"], ["D15", "Slav Defense: Three Knights Variation", "d4 d5 c4 c6 Nf3 Nf6 Nc3"], ["D17", "Slav Defense: Czech Variation", "d4 d5 c4 c6 Nf3 Nf6 Nc3 dxc4 a4 Bf5"], ["D20", "Queen's Gambit Accepted", "d4 d5 c4 dxc4"], ["D21", "Queen's Gambit Accepted: Normal Variation", "d4 d5 c4 dxc4 Nf3"], ["D30", "Queen's Gambit Declined", "d4 d5 c4 e6"], ["D31", "Queen's Gambit Declined: Queen's Knight Variation", "d4 d5 c4 e6 Nc3"], ["D32", "Tarrasch Defense", "d4 d5 c4 e6 Nc3 c5"], ["D35", "Queen's Gambit Declined: Normal Defense", "d4 d5 c4 e6 Nc3 Nf6"], ["D35", "Queen's Gambit Declined: Exchange Variation", "d4 d5 c4 e6 Nc3 Nf6 cxd5 exd5"], ["D37", "Queen's Gambit Declined: Harrwitz Attack", "d4 d5 c4 e6 Nc3 Nf6 Nf3 Be7 Bf4"], ["D43", "Semi-Slav Defense", "d4 d5 c4 e6 Nc3 Nf6 Nf3 c6"], ["D45", "Semi-Slav Defense: Normal Variation", "d4 d5 c4 e6 Nc3 Nf6 Nf3 c6 e3"], ["D44", "Semi-Slav Defense: Botvinnik System", "d4 d5 c4 e6 Nc3 Nf6 Nf3 c6 Bg5 dxc4"], ["D50", "Queen's Gambit Declined: Modern Variation", "d4 d5 c4 e6 Nc3 Nf6 Bg5"], ["D53", "Queen's Gambit Declined: Orthodox Defense", "d4 d5 c4 e6 Nc3 Nf6 Bg5 Be7"], ["D70", "Neo-Grünfeld Defense", "d4 Nf6 c4 g6 f3 d5"], ["D80", "Grünfeld Defense", "d4 Nf6 c4 g6 Nc3 d5"], ["D85", "Grünfeld Defense: Exchange Variation", "d4 Nf6 c4 g6 Nc3 d5 cxd5 Nxd5 e4 Nxc3 bxc3"], ["D90", "Grünfeld Defense: Three Knights Variation", "d4 Nf6 c4 g6 Nc3 d5 Nf3"], ["E00", "Indian Defense: East Indian / Catalan Setup", "d4 Nf6 c4 e6"], ["E01", "Catalan Opening", "d4 Nf6 c4 e6 g3"], ["E04", "Catalan Opening: Open Defense", "d4 Nf6 c4 e6 g3 d5 Bg2 dxc4"], ["E06", "Catalan Opening: Closed Variation", "d4 Nf6 c4 e6 g3 d5 Bg2 Be7"], ["E10", "Indian Defense: Anti-Nimzo-Indian", "d4 Nf6 c4 e6 Nf3"], ["E11", "Bogo-Indian Defense", "d4 Nf6 c4 e6 Nf3 Bb4+"], ["E12", "Queen's Indian Defense", "d4 Nf6 c4 e6 Nf3 b6"], ["E20", "Nimzo-Indian Defense", "d4 Nf6 c4 e6 Nc3 Bb4"], ["E21", "Nimzo-Indian Defense: Three Knights Variation", "d4 Nf6 c4 e6 Nc3 Bb4 Nf3"], ["E24", "Nimzo-Indian Defense: Sämisch Variation", "d4 Nf6 c4 e6 Nc3 Bb4 a3"], ["E32", "Nimzo-Indian Defense: Classical Variation", "d4 Nf6 c4 e6 Nc3 Bb4 Qc2"], ["E40", "Nimzo-Indian Defense: Normal Variation", "d4 Nf6 c4 e6 Nc3 Bb4 e3"], ["E41", "Nimzo-Indian Defense: Hübner Variation", "d4 Nf6 c4 e6 Nc3 Bb4 e3 c5"], ["E60", "King's Indian Defense", "d4 Nf6 c4 g6"], ["E61", "King's Indian Defense: Normal Variation", "d4 Nf6 c4 g6 Nc3 Bg7"], ["E62", "King's Indian Defense: Fianchetto Variation", "d4 Nf6 c4 g6 Nc3 Bg7 Nf3 d6 g3"], ["E70", "King's Indian Defense: Normal Variation, Main Line", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6"], ["E76", "King's Indian Defense: Four Pawns Attack", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f4"], ["E80", "King's Indian Defense: Sämisch Variation", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f3"], ["E90", "King's Indian Defense: Classical Variation", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3"], ["E92", "King's Indian Defense: Petrosian / Main Line", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5"], ["E97", "King's Indian Defense: Orthodox, Mar del Plata", "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7"], ["B06", "Modern Defense: Pterodactyl Variation", "e4 g6 d4 Bg7 Nc3 c5"], ["B00", "Barnes Defense", "e4 f6"], ["C40", "King's Pawn Game: Busch-Gass Gambit", "e4 e5 Nf3 Bc5"], ["C40", "King's Pawn Game: McConnell Defense", "e4 e5 Nf3 Qf6"], ["C40", "Damiano Defense", "e4 e5 Nf3 f6"], ["C41", "Philidor Defense: Hanham Variation", "e4 e5 Nf3 d6 d4 Nd7"], ["C20", "King's Pawn Game: Alapin Opening", "e4 e5 Ne2"], ["C20", "Portuguese Opening", "e4 e5 Bb5"], ["C44", "Irish Gambit", "e4 e5 Nf3 Nc6 Nxe5"], ["C50", "Italian Game: Rousseau Gambit", "e4 e5 Nf3 Nc6 Bc4 f5"], ["C50", "Italian Game: Blackburne-Kostić Gambit", "e4 e5 Nf3 Nc6 Bc4 Nd4"], ["A40", "Kangaroo Defense", "d4 e6 c4 Bb4+"], ["A40", "Queen's Pawn Game: Englund Gambit Complex", "d4 e5 dxe5 Nc6"], ["D00", "Queen's Pawn Game: Levitsky Attack", "d4 d5 Bg5"], ["D00", "Queen's Pawn Game: Mason Attack", "d4 d5 e3"], ["A45", "Indian Defense: Omega Gambit", "d4 Nf6 e4"], ["B01", "Scandinavian Defense: Portuguese Gambit", "e4 d5 exd5 Nf6 d4 Bg4"], ["B02", "Alekhine's Defense: Scandinavian Variation", "e4 Nf6 Nc3 d5"], ["B10", "Caro-Kann Defense: Hillbilly Attack", "e4 c6 Bc4"], ["B10", "Caro-Kann Defense: Accelerated Panov Attack", "e4 c6 c4"], ["B11", "Caro-Kann Defense: Two Knights, 3...Bg4", "e4 c6 Nc3 d5 Nf3 Bg4"], ["B20", "Sicilian Defense: Snyder Variation", "e4 c5 b3"], ["B21", "Sicilian Defense: McDonnell Attack", "e4 c5 f4"], ["B23", "Sicilian Defense: Closed, Traditional", "e4 c5 Nc3 Nc6 g3"], ["B30", "Sicilian Defense: Nyezhmetdinov-Rossolimo Attack", "e4 c5 Nf3 Nc6 Bb5 g6"], ["B40", "Sicilian Defense: Paulsen-Basman Defense", "e4 c5 Nf3 e6 d4 cxd4 Nxd4 Bc5"], ["B50", "Sicilian Defense: Delayed Alapin", "e4 c5 Nf3 d6 c3"], ["C00", "French Defense: King's Indian Attack", "e4 e6 d3"], ["C02", "French Defense: Advance, Paulsen Attack", "e4 e6 d4 d5 e5 c5 c3 Nc6 Nf3"], ["C05", "French Defense: Tarrasch, Closed Variation", "e4 e6 d4 d5 Nd2 Nf6"], ["C07", "French Defense: Tarrasch, Open Variation", "e4 e6 d4 d5 Nd2 c5"]];
+var PUZZLES=[{"fen":"1r3b1r/p1p1qp2/1p3k1p/3Bnp2/1P6/2P1P2P/P1Q2P1P/1K1R2R1 b - - 2 21","moves":["e7b4","c3b4"],"rating":510,"themes":["material"],"dd":1},{"fen":"r1bqkb1r/ppp3pp/8/3P1p2/n2Pp3/2Q5/PPP1NPPP/RNB1K2R w KQkq - 1 10","moves":["a2a3","a4c3"],"rating":512,"themes":["material"],"dd":1},{"fen":"r2qk2r/ppp2ppp/2p2n2/8/1b2P1b1/8/PPPPNPPP/R1BQKB1R w KQkq - 4 7","moves":["e2c3","g4d1"],"rating":519,"themes":["material"],"dd":1},{"fen":"r1b1kr2/pppn2pp/4p3/3pP3/P4B1q/2P3P1/2PQ1P1P/R3KB1R b KQq - 0 15","moves":["b7b6","g3h4"],"rating":519,"themes":["material"],"dd":1},{"fen":"r2q3r/pppkbpp1/5n1p/n2Pp1N1/8/2N5/PPPPQPPP/R1B1K2R w KQ - 0 10","moves":["e2h5","f6h5"],"rating":519,"themes":["material"],"dd":1},{"fen":"r1bqkb1r/ppp1pppp/2n2n2/3p4/P7/2NP1N2/1PP1PPPP/R1BQKB1R b KQkq - 1 4","moves":["c6d4","f3d4"],"rating":521,"themes":["material"],"dd":1},{"fen":"3r1b1r/1pp1kppp/p1n2q2/4p1N1/1P6/PQ1b1N2/3B1PPP/R5KR b - - 1 19","moves":["e7d6","g5f7"],"rating":523,"themes":["material"],"dd":1},{"fen":"6r1/2p4p/2P1k3/2K1pp2/3r1p2/P4P1P/4RPP1/3n2R1 b - - 2 38","moves":["d4d2","e2d2"],"rating":525,"themes":["material"],"dd":1},{"fen":"N1bk3r/pp2bppp/2n1n3/8/5p1P/8/PPPBP1PR/R3KB2 b - - 4 16","moves":["e7h4","h2h4"],"rating":525,"themes":["material"],"dd":1},{"fen":"rnbq1rk1/1pppn1pp/1p2p3/4p3/6P1/2PP4/PP2NP1P/R1BQKB1R w KQ - 0 10","moves":["d1a4","a8a4"],"rating":526,"themes":["material"],"dd":1},{"fen":"r1bq1rk1/pp3p1p/2p2p1n/N1Q1P3/8/4P1P1/PP3P1P/R3KB1R b KQ - 0 15","moves":["d8e7","c5e7"],"rating":526,"themes":["material"],"dd":1},{"fen":"3r1k1r/1ppbqppp/p1nb4/3p4/3PN3/P1QBPN2/1P3PPP/R1B2K1R b - - 0 14","moves":["e7e4","d3e4"],"rating":528,"themes":["material"],"dd":1},{"fen":"r1b1kbnr/pp2pp1p/1q1p2p1/2pP4/4P3/5N2/PPP2PPP/RNBQK2R b KQkq - 2 8","moves":["c8f5","e4f5"],"rating":530,"themes":["material"],"dd":1},{"fen":"3q1rk1/rppb2pp/4pn2/p7/1nPPP3/5N2/PBQ2PPP/R3KB1R w KQ - 1 13","moves":["c4c5","b4c2"],"rating":531,"themes":["material"],"dd":1},{"fen":"rnbqkb1r/pp2pppp/2p2n2/1B1P4/8/8/PPPP1PPP/RNBQK1NR w KQkq - 0 4","moves":["d1f3","c6b5"],"rating":532,"themes":["material"],"dd":1},{"fen":"6r1/3nkpp1/p3p1qp/3p4/3P4/PQ3N2/1Pr2PPP/4R1KR w - - 2 25","moves":["b3b5","a6b5"],"rating":532,"themes":["material"],"dd":1},{"fen":"r1bqkb1r/pppnp1p1/2n2p2/3p2B1/3P4/2Q2N2/PPP1PPBP/RN2K2R w KQkq - 0 10","moves":["e1f1","f6g5"],"rating":532,"themes":["material"],"dd":1},{"fen":"r1bqkb1r/2p1nppp/p1np4/1p1Bp3/4P3/2N2N2/PPPP1PPP/R1BQ1RK1 b kq - 1 7","moves":["c6d4","d5a8"],"rating":534,"themes":["material"],"dd":1},{"fen":"r3kbnr/ppp3pp/2n1q3/3N4/2P5/5p2/PBPP1P1P/RQ3K1R w k - 5 17","moves":["h1g1","e6e2"],"rating":535,"themes":["mateIn1"],"dd":1},{"fen":"r7/pp2q3/6pk/6Np/3Q1P2/8/PPb4P/2R3K1 b - - 1 30","moves":["e7g7","d4g7"],"rating":537,"themes":["material"],"dd":1},{"fen":"r1bqkbnr/pp2pppp/2n5/2pP4/4N3/8/PP1PPPPP/R1BQKBNR b KQkq - 0 4","moves":["g7g6","d5c6"],"rating":538,"themes":["material"],"dd":1},{"fen":"1rbr2k1/pppn1ppp/2n5/1BP1p3/4P3/B1P5/P3NPPP/1R1R2K1 b - - 10 20","moves":["g8f8","b5c6"],"rating":539,"themes":["material"],"dd":1},{"fen":"2rqk2r/ppp2ppp/2np1n2/4p3/2B1P1b1/P1BP1N1P/2P2PP1/R2QK2R w KQk - 1 11","moves":["f3h2","g4d1"],"rating":540,"themes":["material"],"dd":1},{"fen":"r3kb1r/pp1n1ppp/1q2b3/2pp4/8/3P2B1/PPP1NPPP/1R1QKB1R b Kkq - 7 10","moves":["e6h3","g2h3"],"rating":540,"themes":["material"],"dd":1},{"fen":"8/p1R5/p1n3kp/8/2r2p2/P1P5/3K1PP1/8 b - - 9 41","moves":["c6b4","c7c4"],"rating":541,"themes":["material"],"dd":1},{"fen":"2kr1r2/ppp2p2/1n2pq2/7p/3P4/P3Q3/1P3PPP/R1B3KR w - - 0 22","moves":["e3e5","f6e5"],"rating":543,"themes":["material"],"dd":1},{"fen":"r2qkb1r/ppp2ppp/2n5/3np3/4p1bN/3PBPP1/PPP4P/RN1QKB1R w KQkq - 1 8","moves":["f3g4","d5e3"],"rating":544,"themes":["material"],"dd":1},{"fen":"2r3k1/1r6/pnp1p1pp/2B1p1P1/2P1P2P/1P6/P4P2/R2R2K1 w - - 0 33","moves":["d1d4","e5d4"],"rating":545,"themes":["material"],"dd":1},{"fen":"6k1/1p4pp/p7/2r5/1P6/6P1/P1PR1K1P/8 b - - 0 34","moves":["g8h8","d2d8"],"rating":548,"themes":["mateIn1"],"dd":1},{"fen":"r1b2b1r/p3ppp1/1p1nk2p/3p4/3P4/P1N1PN2/1P2KPPP/R1B1R3 w - - 0 14","moves":["c3b5","d6b5"],"rating":549,"themes":["material"],"dd":1},{"fen":"1rb2r1k/pppp1p1p/2n5/3N1q2/2P2P2/3P4/PP2B2P/R1QK3R b - - 3 20","moves":["f8e8","c1c3"],"rating":549,"themes":["material"],"dd":1},{"fen":"3r4/1p3p1k/6pp/1p5r/5pR1/P4P1P/1P2RK2/8 b - - 5 43","moves":["h5h4","g4h4"],"rating":550,"themes":["material"],"dd":1},{"fen":"r1bqk1nr/pppp1ppp/2nb4/4p3/4N3/3PP3/PPP2PPP/R1BQKBNR b KQkq - 0 4","moves":["d8g5","e4g5"],"rating":551,"themes":["material"],"dd":1},{"fen":"r1q1k2r/ppp2ppp/2n5/2b3P1/8/2NQ1N1b/PP1BPP1P/R4K1R w kq - 3 17","moves":["f1g1","c8g4"],"rating":551,"themes":["mateIn1"],"dd":1},{"fen":"r1b3k1/p1p2ppp/1pp5/2N5/8/1R1BB3/q1P2PPP/5RK1 w - - 0 18","moves":["d3b5","c6b5"],"rating":551,"themes":["material"],"dd":1},{"fen":"r1b3k1/2p2ppr/p2pP2p/1p1P2q1/8/1BPN1Q2/P1P2P1P/1R4KR w - - 3 20","moves":["f3g4","g5g4"],"rating":553,"themes":["material"],"dd":1},{"fen":"rnbqk1r1/pp1p1ppp/2pb1n2/4p3/8/3PP3/PPPBNPPP/RN1QKB1R b KQq - 5 6","moves":["d6b4","d2b4"],"rating":554,"themes":["material"],"dd":1},{"fen":"r1bqkb1r/ppp1pppp/2np4/6B1/3P4/2P2N2/P1P1PPPP/R2QKB1R b KQkq - 2 6","moves":["c6e5","d4e5"],"rating":554,"themes":["material"],"dd":1},{"fen":"1r2q3/1bk1b1Qp/p2p1n2/4P3/2p5/P1p2N2/P4PPP/R3R1K1 b - - 0 37","moves":["b7f3","e5f6"],"rating":557,"themes":["material"],"dd":1},{"fen":"3r4/1ppk1p1p/p2n4/3P1p2/5N2/P1RK1P2/P4P1P/8 b - - 13 34","moves":["d6e4","f3e4"],"rating":557,"themes":["material"],"dd":1},{"fen":"r2qkb1r/2p2ppp/8/1P3b2/p2pp3/1B6/1PPNQPPP/R1B2RK1 w kq - 0 14","moves":["e2g4","f5g4"],"rating":558,"themes":["material"],"dd":1},{"fen":"1rb2r1k/1p1p1p1p/3p1p2/p2qp3/4Q3/P2P1K2/5PPP/3R1B1R b - - 1 24","moves":["h8g8","e4d5"],"rating":560,"themes":["material"],"dd":1},{"fen":"1r3nk1/pb6/3Q1p2/4q2p/8/8/PPP2PPP/2KR2R1 w - - 2 27","moves":["d6c7","e5c7"],"rating":564,"themes":["material"],"dd":1},{"fen":"r1b1kbnr/ppp2ppp/2n5/4p3/3Pq3/4BN2/PPPN1PPP/R2QKB1R b KQkq - 4 6","moves":["g8e7","d2e4"],"rating":566,"themes":["material"],"dd":1},{"fen":"2r2b1r/pp1kpppp/2qp1n2/3N4/2P5/3QP3/PP3PPP/R1B1K2R w KQ - 1 13","moves":["d3b3","f6d5"],"rating":566,"themes":["material"],"dd":1},{"fen":"r1bqkb1r/ppppnppp/8/2n1p3/4P3/2NPB3/PPP1NPPP/R2QKB1R b KQkq - 4 5","moves":["f7f5","e3c5"],"rating":567,"themes":["material"],"dd":1},{"fen":"1rbq1rk1/ppp2pp1/2np3p/2bNp3/2B1P3/3P1N2/PPP1QPPP/R4RK1 w - - 0 11","moves":["c4a6","b7a6"],"rating":568,"themes":["material"],"dd":1},{"fen":"rnbqkb1r/pppppp1p/5np1/4P3/3P4/8/PPP2PPP/RNBQKBNR b KQkq - 0 3","moves":["f6g4","d1g4"],"rating":576,"themes":["material"],"dd":1},{"fen":"2krb2r/pp2bp2/1qn1p2p/2p3p1/2BpP3/PN3QB1/1PP3PP/3RKR2 w - - 4 26","moves":["c4e6","f7e6"],"rating":576,"themes":["material"],"dd":1},{"fen":"4r3/2p1k3/1p3p1p/2p3p1/p1P1P1P1/P3K2P/2P1B3/3R4 w - - 0 33","moves":["d1d7","e7d7"],"rating":577,"themes":["material"],"dd":1},{"fen":"r1b1r1k1/1pp2ppp/p7/2q5/3NP3/1Q6/P1P2PPP/R4RK1 w - - 0 18","moves":["f2f3","c5d4"],"rating":577,"themes":["material"],"dd":1},{"fen":"r1bqkb1r/pppppppp/2n2n2/8/6P1/4P3/PPPP1P1P/RNBQKBNR w KQkq - 1 3","moves":["f1a6","b7a6"],"rating":577,"themes":["material"],"dd":1},{"fen":"r1b1kb1r/ppppqppp/2n5/4P3/2BpnB2/5N2/PPPN1PPP/R2Q1RK1 b kq - 2 8","moves":["e4f6","e5f6"],"rating":578,"themes":["material"],"dd":1},{"fen":"r2qkbnr/pp1b1ppp/2Np4/3p4/4PP2/8/PPP3PP/R1BQKB1R b KQkq - 0 8","moves":["g7g5","c6d8"],"rating":581,"themes":["material"],"dd":1},{"fen":"r3r1k1/ppp2p2/1q2bn2/2N4p/2Q1pPp1/8/PPPBB1PP/1K1R1R2 w - - 4 26","moves":["c2c3","e6c4"],"rating":583,"themes":["material"],"dd":1},{"fen":"3r2k1/1p3ppp/p7/3p1P2/3bn1P1/1P6/1B4P1/4R1K1 w - - 0 42","moves":["g1f1","e4g3"],"rating":583,"themes":["mateIn1"],"dd":1},{"fen":"4r1kr/2pq4/p2p1n1p/1p6/3bB1p1/P1P5/1P1BQPPP/1R1R2K1 w - - 1 31","moves":["e4f5","d7f5"],"rating":584,"themes":["material"],"dd":1},{"fen":"r3kbnr/pp1qpppp/2n5/8/3P1Bb1/2N5/PP3PPP/RN1QKB1R w KQkq - 6 9","moves":["d1g4","d7g4"],"rating":584,"themes":["material"],"dd":1},{"fen":"r1b1k1nr/pppp1ppp/2N5/8/4P3/4P3/PqP3PP/RN1QKB1R w KQkq - 0 8","moves":["c6b8","b2a1"],"rating":584,"themes":["material"],"dd":1},{"fen":"r2q1kr1/2pb1pp1/pb2p3/7p/3Pn3/PQPBBN2/1P3PPP/R3R1K1 b - - 2 19","moves":["e4c5","d4c5"],"rating":584,"themes":["material"],"dd":1},{"fen":"3r1r1k/5pp1/p5p1/1pp1N3/4P1b1/2P5/PP3PPP/n1B3KR w - - 0 20","moves":["e5c4","d8d1"],"rating":585,"themes":["mateIn1"],"dd":1},{"fen":"r1b1kbr1/2q3p1/p1P3n1/1p2p3/1n2p3/4B1N1/PPP2PPP/R2QKB1R w KQq - 1 15","moves":["f1b5","a6b5"],"rating":585,"themes":["material"],"dd":1},{"fen":"r1bqk2r/ppp2ppp/2n1pn2/6B1/1bQP4/2N2N2/PP2PPPP/R3KB1R b KQkq - 0 7","moves":["f6d7","g5d8"],"rating":587,"themes":["material"],"dd":1},{"fen":"r2qk2r/pppb1pb1/5np1/3Pp2p/4PP2/2N5/PPBB2PP/R2QK2R b KQkq f3 0 12","moves":["h8h6","f4e5"],"rating":589,"themes":["material"],"dd":1},{"fen":"r1bq3r/pppk1ppp/3n4/2bQP3/2B5/4P3/PPP2PPP/R1B2RK1 w - - 1 12","moves":["d5e4","d6e4"],"rating":592,"themes":["material"],"dd":1},{"fen":"3rkbnr/p3pppp/8/1p2N3/6b1/2N5/PPP2PPP/R1B1K2R w KQk - 0 11","moves":["c3b5","d8d1"],"rating":592,"themes":["mateIn1"],"dd":1},{"fen":"1k6/1pr1p1np/6bb/4N3/PP4P1/2PpPK2/3P4/R1B5 b - - 2 37","moves":["g6e4","f3e4"],"rating":592,"themes":["material"],"dd":1},{"fen":"r7/3k4/4b3/1N1p4/3R2p1/p1P1P3/P3K1P1/8 w - - 4 44","moves":["d4e4","d5e4"],"rating":592,"themes":["material"],"dd":1},{"fen":"r2qk2r/5p1p/ppb1p3/1p4p1/2p1P3/2P2PP1/2Q3BP/R3K1NR w KQk - 0 19","moves":["c2b3","c4b3"],"rating":593,"themes":["material"],"dd":1},{"fen":"r2q1rk1/pbp2p1p/2p2npb/3p4/2B5/1P2PQ2/P1P2PPP/R1B1K1NR w KQ - 0 13","moves":["g2g3","d5c4"],"rating":599,"themes":["material"],"dd":1},{"fen":"rnbqk2r/pp3ppp/2p1pn2/3p4/1bPP4/1QN2N1P/PP2PPP1/R1B1KB1R b KQkq - 2 6","moves":["h8g8","b3b4"],"rating":600,"themes":["material"],"dd":1},{"fen":"2rkq1Q1/ppp5/5p2/8/3P4/P4NP1/1P3P1P/1b3RK1 w - - 3 27","moves":["f1b1","e8g8"],"rating":603,"themes":["material"],"dd":1},{"fen":"r1bq1rk1/ppp2ppp/2p2n2/2b5/2B1P3/8/PPPNQPPP/R1B1K2R b KQ - 5 8","moves":["f6e4","d2e4"],"rating":603,"themes":["material"],"dd":1},{"fen":"r2qkb1r/ppp2ppp/2p2n2/4P3/6b1/8/PPPP1PPP/RNBQKB1R w KQkq - 1 6","moves":["b1a3","g4d1"],"rating":606,"themes":["material"],"dd":1},{"fen":"r2qkb1r/1p3ppp/p2p1n2/2n1p3/2B1P1b1/2N2N1P/PPP1QPP1/R1B1K2R b KQkq - 0 10","moves":["f6d7","h3g4"],"rating":607,"themes":["material"],"dd":1},{"fen":"rnbqkb1r/ppp3pp/3p3n/4pp2/2P5/2NP1N2/PP2PPPP/R1BQKB1R w KQkq - 1 5","moves":["f3d4","e5d4"],"rating":607,"themes":["material"],"dd":1},{"fen":"r1b2b1r/pppq1kpp/2np1n2/3Np3/3PB3/5N2/PPP2PPP/R1BQK2R w KQ - 1 10","moves":["h2h4","f6e4"],"rating":608,"themes":["material"],"dd":1},{"fen":"r4rk1/1b2qpp1/p6p/1pnB4/4p3/2N1PP2/PP5Q/R1B2RK1 w - - 1 22","moves":["a1b1","b7d5"],"rating":608,"themes":["material"],"dd":1},{"fen":"r2qk2r/pp3ppp/5n2/2PP4/2P1p1b1/2P1P3/5PPP/R1BQKB1R w KQkq - 1 14","moves":["c5c6","g4d1"],"rating":609,"themes":["material"],"dd":1},{"fen":"rnbqkbnr/pp1p1p1p/6p1/2p1p3/3PP3/5N2/PPP2PPP/RNBQKB1R w KQkq e6 0 4","moves":["f3h4","d8h4"],"rating":609,"themes":["material"],"dd":1},{"fen":"rnbqkb1r/ppp1pp1p/6p1/3n4/3P4/2N5/PP2PPPP/R1BQKBNR w KQkq - 0 5","moves":["c1f4","d5f4"],"rating":610,"themes":["material"],"dd":1},{"fen":"rnbqkb1r/ppp1nppp/4p3/3p4/3PP3/2N2N2/PPP2PPP/R1BQKB1R b KQkq - 3 4","moves":["e7f5","e4f5"],"rating":610,"themes":["material"],"dd":1},{"fen":"2r1kb1r/4qppp/p1np4/3Bp3/1p2P1b1/3P1N2/PPP1QPPP/R3R1K1 b k - 1 15","moves":["e7e6","d5e6"],"rating":611,"themes":["material"],"dd":1},{"fen":"8/2p5/p3n3/6pk/P1PB4/1P6/7K/8 w - - 3 46","moves":["d4g7","e6g7"],"rating":611,"themes":["material"],"dd":1},{"fen":"2b3kr/1pp2pp1/p6p/2P1N3/3PB2P/4n1P1/P5P1/6KR b - - 3 31","moves":["e3c4","e5c4"],"rating":612,"themes":["material"],"dd":1},{"fen":"r1b1k2r/pp2bppp/3p1n2/2p5/1PBQP2q/2PP4/P4PPP/RNB2RK1 w kq c6 0 13","moves":["h2h3","c5d4"],"rating":612,"themes":["material"],"dd":1},{"fen":"r1bqk1nr/pppp1p2/2n2b2/7p/4P1Q1/4B3/PPP2PPP/RN2KBNR w KQkq h6 0 8","moves":["g4e2","f6b2"],"rating":613,"themes":["material"],"dd":1},{"fen":"rn1q1knr/ppp2ppp/3p4/1BQ2b2/1P2P3/8/P1PP1PPP/RNB1K1NR w KQ - 1 7","moves":["d2d3","d6c5"],"rating":616,"themes":["material"],"dd":1},{"fen":"rnbqkb1r/1p2pppp/p7/1PPp4/3P4/5P2/2PQP1PP/R1B1KBNR b KQkq - 0 8","moves":["a6b5","a1a8"],"rating":617,"themes":["material"],"dd":1},{"fen":"r5k1/2p2pp1/b2b4/1p2R2p/3N4/3B3P/1PK2PP1/8 w - - 2 33","moves":["d4e2","d6e5"],"rating":617,"themes":["material"],"dd":1},{"fen":"r2k2nr/ppp3pp/2n5/3p1pP1/3Pb3/P2B1N1P/1PPK1P2/R1B1R3 w - - 1 16","moves":["d2d1","e4f3"],"rating":618,"themes":["material"],"dd":1},{"fen":"r2qk2r/p2n1ppp/b3pn2/1p1p4/1b1P4/P1NBPN2/1P1Q1PPP/R1B2RK1 b kq - 0 10","moves":["e8g8","a3b4"],"rating":618,"themes":["material"],"dd":1},{"fen":"6k1/pp3p2/2p2b1p/P2p1P2/3P1qP1/2Q4P/1P2rP2/3R2KR w - - 1 33","moves":["c3d3","f4f2"],"rating":618,"themes":["mateIn1"],"dd":1},{"fen":"r1b1k2r/ppp2pbp/2n5/3qp1p1/8/P2B4/1PPP1PPP/R1BQR1K1 b kq - 1 11","moves":["d5b3","c2b3"],"rating":618,"themes":["material"],"dd":1},{"fen":"3rkb1r/pbp2p1p/1pn1pp2/3q4/3PP3/P4N2/1PQN1PPP/2R1KB1R b Kk e3 0 15","moves":["d5d7","f1b5"],"rating":620,"themes":["material","quiet"],"dd":1},{"fen":"2rr2k1/p4pp1/1p1Bp1n1/2Nb4/5P1p/P2P4/1PQ3PP/5KR1 w - - 2 32","moves":["f1f2","d8d6"],"rating":622,"themes":["material"],"dd":1},{"fen":"r1bqk2r/pppn1pbp/3ppnp1/8/2PP1B2/2N2NP1/PP2PP1P/R2QKB1R w KQkq - 0 7","moves":["c3d5","e6d5"],"rating":623,"themes":["material"],"dd":1},{"fen":"r1br4/1p2k2p/p2np1p1/4p1B1/8/2PP3P/PP3PP1/3RR1K1 b - - 1 23","moves":["e7f8","g5d8"],"rating":628,"themes":["material"],"dd":1},{"fen":"rnbr2k1/ppp2pbp/6p1/4N3/2P1n3/2N3P1/PP3P1P/R1B1KB1R w KQ - 0 10","moves":["c1f4","e4c3"],"rating":628,"themes":["material"],"dd":1},{"fen":"2r1kb1r/1p2pppp/4q3/pN3b2/3P4/P1B1QP2/2P4P/1R2KBR1 w k - 3 24","moves":["b1a1","e6e3"],"rating":628,"themes":["material"],"dd":1},{"fen":"4r3/5pb1/1R6/P1R1Pk2/6r1/5pK1/5P2/8 w - - 0 37","moves":["g3h3","e8h8","b6h6","h8h6"],"rating":663,"themes":["mateIn2"],"dd":1},{"fen":"r1bk3r/pppp1ppp/8/3P4/3nq3/P2N1P2/1P1PB1PP/R1BQK2R b KQ - 0 12","moves":["e4e2","d1e2","d4e2","e1e2"],"rating":688,"themes":["material"],"dd":1},{"fen":"r1b1kb1r/pp2pppp/1q3n2/1N1P4/2RP1B2/6N1/P1Q2PPP/4K2R b kq - 2 19","moves":["b6b5","c4c8","a8c8","c2c8"],"rating":689,"themes":["mateIn2"],"dd":1},{"fen":"r3kbr1/pp1np1pp/2p1p3/4P1NQ/1q1P4/6P1/PPB2P1P/R1B2K1R b - - 4 20","moves":["e8d8","g5e6","d8c8","h5e8"],"rating":704,"themes":["mateIn2"],"dd":1},{"fen":"4rk2/pbprqpp1/1pn4p/4P3/P2pQP2/3B1N2/2PB2PP/3R2KR b - - 2 23","moves":["f8g8","e4h7","g8f8","h7h8"],"rating":712,"themes":["mateIn2"],"dd":1},{"fen":"r6r/pp1kpp1p/2p1bnp1/2P5/2NqN3/2PP2P1/P4P1P/3QK2R b K - 0 17","moves":["f6h5","c3d4","e6c4","d3c4"],"rating":730,"themes":["material"],"dd":1},{"fen":"r1b1kbnr/pp1n1ppp/1q1p4/4p1N1/2Q1P3/2N5/PPP2PPP/R1B1KB1R b KQkq - 5 7","moves":["h7h5","c4f7","e8d8","g5e6"],"rating":736,"themes":["mateIn2"],"dd":1},{"fen":"8/p4ppk/p2b3p/8/8/4B2b/2N1qP2/R5K1 w - - 0 39","moves":["c2d4","e2g4","g1h1","g4g2"],"rating":740,"themes":["mateIn2"],"dd":1},{"fen":"6kr/6pp/p4p2/3p4/NP1P1b2/1KPq4/4rPPn/6R1 w - - 0 33","moves":["a4b6","d3c2","b3a3","c2a2"],"rating":753,"themes":["mateIn2"],"dd":1},{"fen":"7r/p3kp1p/p3p1p1/4N3/P2P4/4P3/2r2PPP/R5K1 b - a3 0 21","moves":["e7d8","e5f7","d8e7","f7h8"],"rating":757,"themes":["material"],"dd":1},{"fen":"r3kb1r/1bq2ppp/pp1p1p2/8/2BR1B2/8/PPP1QPPP/5RK1 b kq - 2 15","moves":["f8e7","f4d6"],"rating":759,"themes":["material","sacrifice"],"dd":1},{"fen":"r1bqk2r/pppp1ppp/2nb1n2/4p3/2PPP3/2N2N2/PP3PPP/R1BQKB1R b KQkq d3 0 5","moves":["c6b4","d4e5"],"rating":760,"themes":["material"],"dd":2},{"fen":"r2q1rk1/ppp2p1p/1n1pp1pB/3P4/2n1P3/2N3P1/PP3Q1P/R4RK1 b - - 0 17","moves":["f8e8","f2f7","g8h8","f7g7"],"rating":779,"themes":["mateIn2"],"dd":1},{"fen":"3r1r2/ppp4p/2k1pb2/1bB3pB/4PP2/8/PP4PP/3R2KR w - - 4 29","moves":["c5f8","d8d1"],"rating":780,"themes":["material"],"dd":2},{"fen":"Nq3bkr/7p/2npbp2/1Pp1p3/4P3/3P4/1PP2PPP/R2Q1RK1 b - - 0 16","moves":["b8b5","a8c7","b5b2","c7e6"],"rating":804,"themes":["material","quiet"],"dd":1},{"fen":"r1b2k1r/1p3ppp/4n3/pP3n2/4RN2/5B2/P4PPP/3R2K1 b - - 0 23","moves":["f8g8","d1d8"],"rating":816,"themes":["material"],"dd":2},{"fen":"1r1r2k1/2pq2pn/p3pb2/2p4p/1pPP1P2/3QB3/PP4PP/RN3RK1 w - - 5 24","moves":["d4d5","f6b2"],"rating":819,"themes":["material"],"dd":2},{"fen":"2k2b1r/1p2p3/4p1pp/pB2PqB1/5P2/6K1/PPr3PP/R6R w - - 0 25","moves":["b5a4","f5d3","g3h4","h6g5","h4g5","c2g2"],"rating":829,"themes":["mateIn3","long"],"dd":1},{"fen":"rnbqkb1r/ppp1pppp/8/4P3/2P1n3/5N2/PP3PPP/RNBQKB1R w KQkq - 1 7","moves":["b1a3","d8d1","e1d1","e4f2","d1e1","f2h1"],"rating":834,"themes":["material","long"],"dd":1},{"fen":"3rk2r/ppp2p1p/3b4/4pp2/3nP3/1P1PNP2/1qP1K1PP/R3QB1R w k - 1 18","moves":["e2d1","b2a1","d1d2","d6b4","c2c3","b4c3"],"rating":837,"themes":["mateIn3","long"],"dd":1},{"fen":"rnbqk2r/ppp2pbp/5np1/3p2B1/3PP3/2N5/PP2NPPP/R2QKB1R b KQkq - 1 7","moves":["d8d6","e4e5"],"rating":840,"themes":["material","quiet"],"dd":2},{"fen":"rq4k1/p1p3pp/2p2n2/2Prp3/1b6/1Q2BN2/PP3P1P/R2R2K1 b - - 4 18","moves":["f6e4","d1d5","c6d5","b3d5","g8h8","d5e4"],"rating":869,"themes":["material","long"],"dd":1},{"fen":"r2r4/p1p1n1p1/4q3/1Pk1p3/Q2n2P1/3PB1PP/P7/3RR1K1 b - - 0 25","moves":["e6d6","d1c1","c5b6","a4a6"],"rating":882,"themes":["mateIn2"],"dd":2},{"fen":"r3kb1r/pppq1ppp/2npbn2/1B2p3/3PP3/2N2N2/PPP2PPP/R1BQ1RK1 b kq - 0 7","moves":["e8c8","d4d5"],"rating":886,"themes":["material","quiet"],"dd":2},{"fen":"r1b1kb1r/ppp2ppp/2np1n2/1B2p3/1q2P3/2NPBN2/PPP2PPP/RQ3RK1 b kq - 3 8","moves":["c8g4","a2a3"],"rating":896,"themes":["material","quiet"],"dd":2},{"fen":"r4r1k/p5pp/3pB3/1Pb1p2p/4P3/3P4/1PP2PR1/R3K3 b Q - 0 26","moves":["c5f2","g2f2","f8f2","e1f2"],"rating":902,"themes":["material","sacrifice"],"dd":1},{"fen":"r1k4r/ppp2ppp/2p5/4PnB1/1b4bP/2NR1N2/PPP2P2/3R2K1 b - - 5 15","moves":["h7h6","d3d8","h8d8","d1d8"],"rating":904,"themes":["mateIn2"],"dd":2},{"fen":"6kr/2p2ppp/5q2/1QN1p3/4P3/5PPP/3r2K1/4b3 w - - 3 33","moves":["g2f1","f6f3","f1e1","f3d1"],"rating":909,"themes":["mateIn2"],"dd":2},{"fen":"1rn3k1/2Q2p1p/3p1Pp1/PNpPr3/2P1P1bP/2PB4/5RP1/R5K1 b - - 0 35","moves":["b8b5","c7d8","e5e8","d8e8"],"rating":913,"themes":["mateIn2"],"dd":2},{"fen":"2r5/5ppk/8/pq1pP3/1B3P2/7p/3KN2P/1R5R w - - 0 37","moves":["e2d4","b5c4"],"rating":924,"themes":["material","quiet"],"dd":2},{"fen":"k7/p1q2p2/B5b1/2Q3p1/3P1p2/P1N5/1P1K2PP/R1B3R1 b - - 6 25","moves":["c7d8","c5c6","a8b8","c6b7"],"rating":924,"themes":["mateIn2"],"dd":2},{"fen":"r1bqk2r/pppnbp2/3p4/6Np/3PQB2/8/PPP2PPP/RN2KB1R b KQkq - 0 9","moves":["f7f6","e4g6","e8f8","g6f7"],"rating":925,"themes":["mateIn2"],"dd":2},{"fen":"r1b5/2pp1Bpk/p2b3p/4r3/1p1Nq3/1Q1R4/PPP2PPP/R5K1 w - - 0 26","moves":["f7c4","e4e1","a1e1","e5e1"],"rating":929,"themes":["mateIn2"],"dd":2},{"fen":"5k2/1p5p/p3r2P/4n1p1/P1b2p2/8/2P3P1/6K1 w - - 4 49","moves":["g1f2","e5g4","f2f3","c4e2"],"rating":936,"themes":["mateIn2"],"dd":2},{"fen":"r4k1r/ppn2ppp/2b5/q3pN2/2ppP1P1/4B3/PPP1BP1P/R2Q1K1R b - g3 0 18","moves":["d4e3","d1d6","f8g8","f5e7"],"rating":938,"themes":["material"],"dd":2},{"fen":"8/2p2pp1/p2k4/8/1N1r2n1/P6R/3r1PP1/R5K1 w - - 5 37","moves":["h3g3","d2d1","a1d1","d4d1"],"rating":943,"themes":["mateIn2"],"dd":2},{"fen":"r3kb1r/1pqnpppp/2p1bn2/p7/Q2PP3/2N2N2/PP3PPP/R1B1KB1R w KQkq - 2 12","moves":["f1c4","d7b6"],"rating":947,"themes":["material","quiet"],"dd":2},{"fen":"2rr2k1/p5pp/P7/2p4Q/3nR1P1/P2P3P/2pK1P2/5B1R b - g3 0 37","moves":["c8c7","e4e8","d8e8","h5e8"],"rating":962,"themes":["mateIn2"],"dd":2},{"fen":"r1b1k3/p1p2p1p/4pBr1/1q1p4/1b6/2Q5/PPP1PPPP/RN2KB1R w KQq - 0 15","moves":["b2b3","g6f6"],"rating":966,"themes":["material","sacrifice"],"dd":2},{"fen":"r2r4/1p1k1ppp/4p3/qNb5/1p3P2/8/PPP1NnPP/1K3BR1 w - - 2 22","moves":["g2g4","a5a2","b1c1","c5e3"],"rating":976,"themes":["mateIn2"],"dd":2},{"fen":"r1b3k1/1p1p1r2/8/6pp/1b3q2/1Q3P2/4K1PP/7R w - - 0 45","moves":["h2h3","f4d2","e2f1","d2e1"],"rating":977,"themes":["mateIn2"],"dd":2},{"fen":"r2qk2r/1pp3bp/2b3p1/pN2pp2/Q1P3n1/P4P2/1P1N3P/R1B1KB1R w KQkq - 0 15","moves":["f1e2","d8h4","e1d1","g4e3"],"rating":997,"themes":["mateIn2"],"dd":2},{"fen":"8/6p1/p6p/1p1kP2P/2p5/P1K5/1P1N2r1/6B1 w - - 0 44","moves":["d2f3","g2g3","c3b4","g3f3"],"rating":1003,"themes":["material","quiet"],"dd":2},{"fen":"r1bqkb1r/pppn1ppp/4p3/3pP3/3Pn3/5N2/PPPN1PPP/R1BQKB1R w KQkq - 3 8","moves":["b2b3","e4c3","c1b2","c3d1"],"rating":1015,"themes":["material","quiet"],"dd":2},{"fen":"2Bn4/r1N2p1k/6p1/4p2p/8/7P/P1P2PP1/1nB3K1 w - - 0 27","moves":["c7a6","a7a8","c8d7","a8a6"],"rating":1017,"themes":["material","quiet"],"dd":2},{"fen":"rnb1kb1r/pp1p1ppp/1q6/2pP4/6n1/1P2B3/P3PPPP/RN1QKBNR w KQkq - 1 7","moves":["e3f4","b6f6","b1d2","f6f4"],"rating":1020,"themes":["material","quiet"],"dd":2},{"fen":"rn2k2r/ppp2ppp/5n2/4p3/1P2P2P/3P1b2/PP1K1P2/R1B3q1 w kq - 0 14","moves":["d2e3","g1d1","b4b5","f6g4"],"rating":1041,"themes":["mateIn2","quiet"],"dd":2},{"fen":"r1bq1rk1/ppp2ppp/7n/2n1P3/2NQ4/2N1P1P1/PP3P1P/R3KB1R b KQ - 4 11","moves":["d8e7","c3d5","e7e8","d4c5"],"rating":1049,"themes":["material","quiet"],"dd":2},{"fen":"r1bqkb1r/ppp2ppp/2n5/3p4/3P4/4B3/PP2PPPP/R2QKBNR w KQkq - 2 7","moves":["d1d2","f8b4"],"rating":1052,"themes":["material","sacrifice","quiet"],"dd":2},{"fen":"2r2b2/ppp1k3/2b4Q/4P1P1/6n1/3P4/P1P3P1/R1QK2q1 w - - 0 26","moves":["d1e2","g1g2","e2d1","c6f3","d1e1","g2f2"],"rating":1053,"themes":["mateIn3","long"],"dd":2},{"fen":"1r1k3r/p1p2ppp/2P5/1Bb2b2/P3pB2/8/1PP2PPP/4RRK1 b - a3 0 14","moves":["c5d4","e1d1","d8e7","d1d4"],"rating":1056,"themes":["material","quiet"],"dd":2},{"fen":"6k1/1r3p1p/8/8/2BK4/5b2/3R3P/8 w - - 6 42","moves":["c4d5","f3d5"],"rating":1065,"themes":["material"],"dd":3},{"fen":"6kr/2p2ppp/5q2/1QN1p3/4P3/5PPP/3r4/4bK2 b - - 4 33","moves":["f6e6","b5b8","e6c8","b8c8","d2d8","c8d8"],"rating":1068,"themes":["mateIn3","long"],"dd":2},{"fen":"1rbqk2r/ppppnppp/3b1n2/3Pp3/2P1P3/2N1BN2/PP3PPP/R2QKB1R b KQk - 4 7","moves":["a7a5","c4c5","d6c5","e3c5"],"rating":1069,"themes":["material","quiet"],"dd":2},{"fen":"r1bqk2r/pppp1ppp/2nb1n2/1B2pQ2/4P3/8/PPPP1PPP/RNB1K1NR w KQkq - 6 5","moves":["d2d3","c6d4","f5g5","d4c2"],"rating":1076,"themes":["material","quiet"],"dd":2},{"fen":"r1bqk2r/ppp1nppp/5n2/3PN3/5p2/N7/1PP1K1PP/R1BQ1B1R w kq - 1 11","moves":["e2d3","d8d5","d3e2","d5e5","e2f2","f6e4"],"rating":1077,"themes":["material","long"],"dd":2},{"fen":"r1b1kbnr/pp1n1ppp/3p1q2/2p5/Q2PP3/4BN2/PP3PPP/RN2KB1R b KQkq - 0 7","moves":["e8d8","e3g5"],"rating":1078,"themes":["material","sacrifice","quiet"],"dd":2},{"fen":"8/5p2/p3r2k/2R5/2P5/5KBP/P1P2P1P/6R1 b - - 4 34","moves":["e6b6","g3f4","h6h7","c5h5","b6h6","h5h6"],"rating":1085,"themes":["mateIn3","long"],"dd":2},{"fen":"8/3p1Rpk/7p/8/q2p4/5P2/1Pn2K1P/6R1 b - - 0 47","moves":["d7d5","f7g7","h7h8","g7g8","h8h7","g1g7"],"rating":1093,"themes":["mateIn3","long"],"dd":2},{"fen":"r3k1nr/ppp2pp1/2b1pq2/8/2p4p/P1N2N1K/1P2PbPP/R1BQ1B1R w kq - 0 13","moves":["d1b3","f6f5","g2g4","h4g3","h3g2","f5h3"],"rating":1120,"themes":["mateIn3","long"],"dd":2},{"fen":"2k5/1p3pb1/1P6/2Pr1q2/2QP3P/PN1R2B1/2K2P2/4R3 b - - 0 45","moves":["c8d7","c4a4","d7c8","a4a8","c8d7","a8e8"],"rating":1141,"themes":["mateIn3","long"],"dd":2},{"fen":"5kr1/1pp3p1/p7/3R3p/4pq2/P1Q5/1PP2P2/1K6 b - - 0 36","moves":["e4e3","c3c5","f8e8","d5e5"],"rating":1145,"themes":["material"],"dd":3},{"fen":"2k1rr2/1pp2qp1/p2p3p/3Pp1b1/3nQ1P1/P1N4P/3N1P2/2B1R1KR w - - 4 31","moves":["e4g2","g5d2","c1d2","d4f3"],"rating":1148,"themes":["material"],"dd":3},{"fen":"r3k2r/1pq2ppp/4p1b1/p7/3n1NP1/3P4/PPP1BPP1/R2Q1RK1 w kq - 1 16","moves":["d1d2","c7f4"],"rating":1169,"themes":["material","sacrifice"],"dd":3},{"fen":"4r1k1/pp5p/2n2pp1/3Q4/3P1R2/P2B2P1/1PP2PP1/1K6 b - - 0 27","moves":["g8f8","f4f6","f8g7","d5f7","g7h6","f6g6","h7g6","f7g6"],"rating":1203,"themes":["mateIn4","long"],"dd":2},{"fen":"r1b1kb1r/ppppqp1p/2n2n2/4p1Q1/4P3/2N2N1P/PPPP1PP1/R1B1KB1R b KQkq - 2 6","moves":["e7d6","c3b5","d6e7","b5c7","e8d8","c7a8"],"rating":1212,"themes":["material","quiet","long"],"dd":2},{"fen":"4rb2/3k1pp1/ppqp1p2/2p1nP1r/P1P5/3P2QP/1P1B1P2/RB2R1K1 w - - 2 26","moves":["e1e3","h5g5","g3g5","f6g5"],"rating":1222,"themes":["material","sacrifice","quiet"],"dd":2},{"fen":"r4rk1/1pp1p1bp/p3p1p1/4q3/2P5/2N1Q3/PP4PP/R3KBR1 w Q - 0 16","moves":["f1d3","e5e3","c3e2","g7b2","e1d1","e3d3"],"rating":1272,"themes":["material","long"],"dd":3},{"fen":"r1bqk2r/pppp1ppp/3b1n2/8/2BpP3/2PP4/PP2QPPP/RNB2RK1 b kq - 0 8","moves":["c7c5","e4e5"],"rating":1287,"themes":["material","quiet"],"dd":4},{"fen":"2r5/1pp2R2/p5p1/3k3p/3P4/3K3P/PPP2PP1/4R3 b - - 1 31","moves":["b7b6","f7f6","g6g5","c2c4"],"rating":1304,"themes":["mateIn2","quiet"],"dd":3},{"fen":"r1b1r1k1/1ppp1pp1/p7/7p/3n4/P2B4/1PPq2PP/R4K1R w - h6 0 18","moves":["f1g1","e8e1","a1e1","d2e1","d3f1","d4e2"],"rating":1305,"themes":["mateIn3","long"],"dd":3},{"fen":"r1b1kb1r/pp2pppp/2n2q2/8/1p1N1Bn1/8/P1P1NPPP/1R1QKB1R b Kkq - 5 12","moves":["b7b5","d4b5","c8d7","b5c7","e8d8","c7a8"],"rating":1318,"themes":["material","long"],"dd":3},{"fen":"2B1k2r/R1pn1ppp/2N1b3/8/4P3/2P5/1r3PPP/4K2R w Kk - 0 20","moves":["h1f1","b2b1","e1e2","e6c4","e2f3","c4f1"],"rating":1325,"themes":["material","long"],"dd":3},{"fen":"1r2r1k1/p1p1qp1p/2pb1n2/3p2B1/3P2b1/P1PQ1NP1/1P3P1P/R4K1R w - - 1 20","moves":["a1e1","g4h3","f1g1","e7e1","f3e1","e8e1","d3f1","e1f1"],"rating":1434,"themes":["mateIn4","long"],"dd":3},{"fen":"8/5k2/8/1P1K2Q1/3P1P2/8/6P1/8 b - - 2 56","moves":["f7f8","d5e6","f8e8","g5e7"],"rating":1467,"themes":["mateIn2","quiet"],"dd":4},{"fen":"1r4k1/1pp1qp2/pbb4Q/4pp1N/1P1p3P/P2B1nPN/2PP1P2/3R1K2 b - - 1 30","moves":["f3h2","f1e1"],"rating":1508,"themes":["material","quiet"],"dd":5},{"fen":"r1bq1b1r/pp1p1ppp/2n1kn2/4pNB1/4P3/2N5/PPP1BPPP/R2QK2R b KQ - 3 9","moves":["d8a5","d1d6","f8d6","e2c4","a5d5","c4d5","f6d5","f5g7"],"rating":1648,"themes":["mateIn4","long"],"dd":4},{"fen":"5r2/1pp3p1/p1bk3p/8/1PPp1r2/3R3P/P3R2K/8 w - - 1 38","moves":["e2e7","f4f2","h2g3","f2g2","g3h4","f8f4","h4h5","g2g5"],"rating":1673,"themes":["mateIn4","long"],"dd":4},{"fen":"8/8/7p/8/8/1r2k3/8/6K1 w - - 10 55","moves":["g1h2","e3f2","h2h1","b3h3"],"rating":1723,"themes":["mateIn2","quiet"],"dd":5},{"fen":"5rk1/ppqnb1pp/4p3/2P1p1P1/1P1p3P/1N6/PB3r2/R2QR1K1 w - - 0 24","moves":["b2a3","e5e4","b3d4","c7h2"],"rating":1754,"themes":["mateIn2","quiet"],"dd":5},{"fen":"3rk2r/pb3ppp/5n2/4p3/1bPq4/2N5/PP1B1PPP/3RKB1R w Kk - 2 15","moves":["a2a3","f6g4","c3e4","b7e4","a3b4","d4f2"],"rating":1826,"themes":["mateIn3","quiet","long"],"dd":5},{"fen":"r1bq1b1r/pppkn3/4p2p/3pP1pQ/8/2NBB3/PPP2PPP/R2R2K1 b - - 1 13","moves":["e7c6","c3d5","e6d5","d3f5","d7e7","e3g5"],"rating":1858,"themes":["material","sacrifice","long"],"dd":5},{"fen":"r4rk1/ppp1qppp/3p1n2/3P4/2P5/3Q4/PB1P1PP1/1R4KR b - - 0 18","moves":["a8d8","b2f6","h7h6","h1h6","e7e4","d3e4"],"rating":1933,"themes":["material","long"],"dd":6},{"fen":"1r1r2k1/2p2pb1/2P3p1/p3P1Q1/P7/5N2/2q2PPP/4R1KR w - - 3 27","moves":["e1c1","d8d1","f3e1","d1c1","g5e3","c1e1"],"rating":2012,"themes":["material","long"],"dd":6}];
+</script>
+<script>
+/* ===== Brett-komponent med animasjon, klikk og dra ===== */
+var GLYPH = { k: '\u265A', q: '\u265B', r: '\u265C', b: '\u265D', n: '\u265E', p: '\u265F' };
+var VS = '\uFE0E';
+function sqToRC(sq) { return { c: sq.charCodeAt(0) - 97, r: 8 - parseInt(sq[1], 10) }; }
+function rcToSq(r, c) { return 'abcdefgh'[c] + (8 - r); }
+function Board(el) {
+  var self = this;
+  this.el = el; this.flipped = false; this.pieces = {}; this.state = {};
+  this.movable = function () { return false; }; this.dests = function () { return []; }; this.onMove = null;
+  el.innerHTML = '';
+  this.sqLayer = document.createElement('div'); this.sqLayer.className = 'squares'; el.appendChild(this.sqLayer);
+  this.pLayer = document.createElement('div'); this.pLayer.className = 'pieces'; el.appendChild(this.pLayer);
+  this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); this.svg.setAttribute('class', 'arrows'); this.svg.setAttribute('viewBox', '0 0 8 8'); el.appendChild(this.svg);
+  this.bLayer = document.createElement('div'); this.bLayer.className = 'badges'; el.appendChild(this.bLayer);
+  this.sqEls = {};
+  this.buildSquares();
+  var ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(function () { self.resize(); }) : null;
+  if (ro) ro.observe(el); window.addEventListener('resize', function () { self.resize(); });
+  this.resize();
+  this.bindPointer();
+}
+Board.prototype.resize = function () { var w = this.el.clientWidth || 640; this.el.style.setProperty('--sqpx', (w / 8) + 'px'); };
+Board.prototype.buildSquares = function () {
+  this.sqLayer.innerHTML = ''; this.sqEls = {};
+  for (var vr = 0; vr < 8; vr++) for (var vc = 0; vc < 8; vc++) {
+    var r = this.flipped ? 7 - vr : vr, c = this.flipped ? 7 - vc : vc, name = rcToSq(r, c);
+    var d = document.createElement('div'); d.className = 'sq ' + (((r + c) & 1) ? 'd' : 'l'); d.dataset.sq = name;
+    var hl = document.createElement('div'); hl.className = 'hl'; d.appendChild(hl);
+    if (vc === 0) { var cr = document.createElement('span'); cr.className = 'coord r'; cr.textContent = 8 - r; d.appendChild(cr); }
+    if (vr === 7) { var cf = document.createElement('span'); cf.className = 'coord f'; cf.textContent = 'abcdefgh'[c]; d.appendChild(cf); }
+    this.sqLayer.appendChild(d); this.sqEls[name] = d;
+  }
+};
+Board.prototype.xy = function (sq) { var p = sqToRC(sq); return this.flipped ? { x: 7 - p.c, y: 7 - p.r } : { x: p.c, y: p.r }; };
+Board.prototype.place = function (el, sq) { var p = this.xy(sq); el.style.transform = 'translate(' + (p.x * 100) + '%,' + (p.y * 100) + '%)'; };
+Board.prototype.makePiece = function (pc) {
+  var e = document.createElement('div'); e.className = 'piece ' + pc[0]; e.textContent = GLYPH[pc[1]] + VS; e.dataset.pc = pc; return e;
+};
+Board.prototype.setFlipped = function (f) {
+  if (this.flipped === f) return; this.flipped = f; this.buildSquares();
+  for (var sq in this.pieces) { var e = this.pieces[sq].el; e.style.transition = 'none'; this.place(e, sq); void e.offsetWidth; e.style.transition = ''; }
+  this.applyMarks(); if (this.onFlip) this.onFlip(f);
+};
+// arr: 64 entries a8..h1 like 'wp' or null
+Board.prototype.setPosition = function (arr, opts) {
+  opts = opts || {}; var animate = opts.animate !== false, self = this;
+  var want = {}; for (var i = 0; i < 64; i++) if (arr[i]) want[rcToSq(i >> 3, i & 7)] = arr[i];
+  var old = this.pieces, next = {}, sources = [], targets = [];
+  for (var sq in old) { if (want[sq] === old[sq].pc) next[sq] = old[sq]; else sources.push(sq); }
+  for (sq in want) if (!next[sq]) targets.push(sq);
+  function dist(a, b) { var A = sqToRC(a), B = sqToRC(b); return Math.abs(A.r - B.r) + Math.abs(A.c - B.c); }
+  // prefer exact hint (from->to)
+  var hint = opts.move;
+  function takeSource(pred, t) {
+    var best = -1, bd = 99;
+    for (var k = 0; k < sources.length; k++) { var s = sources[k]; if (!pred(old[s].pc)) continue; var d = (hint && hint.from === s && hint.to === t) ? -1 : dist(s, t); if (d < bd) { bd = d; best = k; } }
+    if (best < 0) return null; return sources.splice(best, 1)[0];
+  }
+  targets.sort(function (a, b) { return (hint && a === hint.to) ? -1 : (hint && b === hint.to) ? 1 : 0; });
+  targets.forEach(function (t) {
+    var pc = want[t];
+    var s = takeSource(function (p) { return p === pc; }, t);
+    var promo = false;
+    if (!s && hint && hint.to === t) { s = takeSource(function (p) { return p === pc[0] + 'p'; }, t); promo = !!s; }
+    if (s) {
+      var obj = old[s], e = obj.el;
+      if (animate && !(opts.instant && hint && hint.to === t)) { e.classList.add('moving'); self.place(e, t); setTimeout(function () { e.classList.remove('moving'); }, self.animMs() + 30); }
+      else { e.style.transition = 'none'; self.place(e, t); void e.offsetWidth; e.style.transition = ''; }
+      if (promo) { setTimeout(function () { e.textContent = GLYPH[pc[1]] + VS; e.dataset.pc = pc; }, animate ? self.animMs() : 0); }
+      next[t] = { pc: pc, el: e };
+    } else {
+      var ne = self.makePiece(pc); self.place(ne, t); if (animate) ne.classList.add('appear'); self.pLayer.appendChild(ne); next[t] = { pc: pc, el: ne };
+    }
+  });
+  sources.forEach(function (s) {
+    var e = old[s].el;
+    if (animate) { e.classList.add('fade'); setTimeout(function () { if (e.parentNode) e.parentNode.removeChild(e); }, self.animMs() * 1.3 + 50); }
+    else if (e.parentNode) e.parentNode.removeChild(e);
+  });
+  this.pieces = next;
+  this.dragEl = null;
+};
+Board.prototype.animMs = function () { return parseInt(getComputedStyle(document.documentElement).getPropertyValue('--anim'), 10) || 450; };
+// marks: {last:[a,b], check:sq, selected:sq, dots:[], hint:sq, wrong:sq, right:sq, arrows:[{from,to,color}], badge:{sq,color,icon}, lastColor}
+Board.prototype.setMarks = function (m) { this.state = m || {}; this.applyMarks(); };
+Board.prototype.patchMarks = function (m) { for (var k in m) this.state[k] = m[k]; this.applyMarks(); };
+Board.prototype.applyMarks = function () {
+  var st = this.state, self = this;
+  for (var sq in this.sqEls) {
+    var d = this.sqEls[sq]; d.classList.remove('last', 'selected', 'check', 'hint', 'wrong', 'right');
+    var hl = d.firstChild; hl.style.background = '';
+    var x = d.querySelector('.dot,.ring'); if (x) d.removeChild(x);
+  }
+  if (st.last) st.last.forEach(function (s) { var d = self.sqEls[s]; if (d) { d.classList.add('last'); if (st.lastColor) d.firstChild.style.background = st.lastColor; } });
+  if (st.check && this.sqEls[st.check]) this.sqEls[st.check].classList.add('check');
+  ['hint', 'wrong', 'right'].forEach(function (k) { if (st[k] && self.sqEls[st[k]]) self.sqEls[st[k]].classList.add(k); });
+  if (st.selected && this.sqEls[st.selected]) this.sqEls[st.selected].classList.add('selected');
+  (st.dots || []).forEach(function (s) { var d = self.sqEls[s]; if (!d) return; var e = document.createElement('div'); e.className = self.pieces[s] ? 'ring' : 'dot'; d.appendChild(e); });
+  // arrows
+  var svg = this.svg; while (svg.firstChild) svg.removeChild(svg.firstChild);
+  var NS = 'http://www.w3.org/2000/svg';
+  (st.arrows || []).forEach(function (a, i) {
+    var A = self.xy(a.from), B = self.xy(a.to);
+    var x1 = A.x + .5, y1 = A.y + .5, x2 = B.x + .5, y2 = B.y + .5, dx = x2 - x1, dy = y2 - y1, len = Math.sqrt(dx * dx + dy * dy);
+    if (!len) return; var ux = dx / len, uy = dy / len, hw = .14, hl = .32, sw = .055;
+    var ex = x2 - ux * hl, ey = y2 - uy * hl, sx = x1 + ux * .22, sy = y1 + uy * .22;
+    var px = -uy, py = ux;
+    var pts = [[sx + px * sw, sy + py * sw], [ex + px * sw, ey + py * sw], [ex + px * hw * 1.6, ey + py * hw * 1.6], [x2 - ux * .08, y2 - uy * .08], [ex - px * hw * 1.6, ey - py * hw * 1.6], [ex - px * sw, ey - py * sw], [sx - px * sw, sy - py * sw]];
+    var poly = document.createElementNS(NS, 'polygon'); poly.setAttribute('points', pts.map(function (p) { return p[0].toFixed(3) + ',' + p[1].toFixed(3); }).join(' '));
+    poly.setAttribute('fill', a.color || 'rgba(150,190,70,.85)'); poly.setAttribute('opacity', a.opacity || '0.85'); svg.appendChild(poly);
+  });
+  // badge
+  this.bLayer.innerHTML = '';
+  if (st.badge) {
+    var p = this.xy(st.badge.sq), b = document.createElement('div'); b.className = 'badge';
+    b.style.left = (p.x * 12.5) + '%'; b.style.top = (p.y * 12.5) + '%';
+    var i = document.createElement('i'); i.style.background = st.badge.color; i.textContent = st.badge.icon; b.appendChild(i); this.bLayer.appendChild(b);
+  }
+};
+Board.prototype.sqFromPoint = function (x, y) {
+  var r = this.el.getBoundingClientRect(); var vx = Math.floor((x - r.left) / r.width * 8), vy = Math.floor((y - r.top) / r.height * 8);
+  if (vx < 0 || vx > 7 || vy < 0 || vy > 7) return null;
+  return this.flipped ? rcToSq(7 - vy, 7 - vx) : rcToSq(vy, vx);
+};
+Board.prototype.select = function (sq) {
+  this.selected = sq; var dl = sq ? this.dests(sq) : [];
+  this.state.selected = sq; this.state.dots = dl; this.applyMarks();
+};
+Board.prototype.tryMove = function (from, to, instant) {
+  var dl = this.dests(from);
+  if (dl.indexOf(to) < 0) return false;
+  this.select(null);
+  if (this.onMove) this.onMove(from, to, instant);
+  return true;
+};
+Board.prototype.bindPointer = function () {
+  var self = this, drag = null;
+  this.el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  this.el.addEventListener('pointerdown', function (e) {
+    if (e.button !== 0) return;
+    var sq = self.sqFromPoint(e.clientX, e.clientY); if (!sq) return;
+    if (self.selected && sq !== self.selected && self.dests(self.selected).indexOf(sq) >= 0) { self.tryMove(self.selected, sq, false); return; }
+    if (self.movable(sq) && self.pieces[sq]) {
+      if (self.selected === sq) { drag = { sq: sq, x: e.clientX, y: e.clientY, el: self.pieces[sq].el, moved: false, wasSel: true }; }
+      else { self.select(sq); drag = { sq: sq, x: e.clientX, y: e.clientY, el: self.pieces[sq].el, moved: false }; }
+      try { self.el.setPointerCapture(e.pointerId); } catch (er) { }
+      e.preventDefault();
+    } else self.select(null);
+  });
+  this.el.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    if (!drag.moved && Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 5) return;
+    drag.moved = true; drag.el.classList.add('dragging');
+    var r = self.el.getBoundingClientRect(), s = r.width / 8;
+    var px = (e.clientX - r.left - s / 2) / s * 100, py = (e.clientY - r.top - s / 2) / s * 100;
+    drag.el.style.transform = 'translate(' + px + '%,' + py + '%)';
+  });
+  function end(e) {
+    if (!drag) return; var d = drag; drag = null;
+    if (!d.moved) { if (d.wasSel) self.select(null); return; }
+    d.el.classList.remove('dragging');
+    var to = self.sqFromPoint(e.clientX, e.clientY);
+    if (to && to !== d.sq && self.dests(d.sq).indexOf(to) >= 0) {
+      d.el.style.transition = 'none'; self.place(d.el, to); void d.el.offsetWidth; d.el.style.transition = '';
+      self.tryMove(d.sq, to, true);
+    } else { self.place(d.el, d.sq); }
+  }
+  this.el.addEventListener('pointerup', end);
+  this.el.addEventListener('pointercancel', function (e) { if (drag) { drag.el.classList.remove('dragging'); self.place(drag.el, drag.sq); drag = null; } });
+};
+Board.prototype.askPromotion = function (color) {
+  var self = this;
+  return new Promise(function (res) {
+    var o = document.createElement('div'); o.className = 'promo';
+    ['q', 'r', 'b', 'n'].forEach(function (p) {
+      var b = document.createElement('button'); b.textContent = GLYPH[p] + VS; b.title = { q: 'Dronning', r: 'Tårn', b: 'Løper', n: 'Springer' }[p];
+      b.style.color = color === 'w' ? '#fff' : '#222'; b.style.webkitTextStroke = color === 'w' ? '1.5px #222' : '0';
+      b.addEventListener('click', function (e) { e.stopPropagation(); o.remove(); res(p); }); o.appendChild(b);
+    });
+    o.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    self.el.appendChild(o);
+  });
+};
+/* ===== Lagring ===== */
+var Store = (function () {
+  var KEY = 'sjakkstudio.v1', mem = null, ok = true;
+  function def() { return { puzzle: { rating: 800, count: 0, solved: 0, streak: 0, bestStreak: 0, offset: 0, history: [], attempted: {}, pr: {} }, settings: { anim: 450, sound: true, coords: true, theme: 'green', depth: 'normal', engine: 'auto' }, bot: { stats: {}, current: null, lastRating: 1200, lastColor: 'w' }, lastPgn: '' }; }
+  function load() {
+    if (mem) return mem;
+    try { var s = localStorage.getItem(KEY); mem = s ? JSON.parse(s) : def(); } catch (e) { ok = false; mem = def(); }
+    var d = def(); for (var k in d) if (!(k in mem)) mem[k] = d[k];
+    for (k in d.puzzle) if (!(k in mem.puzzle)) mem.puzzle[k] = d.puzzle[k];
+    for (k in d.settings) if (!(k in mem.settings)) mem.settings[k] = d.settings[k];
+    for (k in d.bot) if (!(k in mem.bot)) mem.bot[k] = d.bot[k];
+    return mem;
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch (e) { ok = false; } }
+  return { get: load, save: save, ok: function () { load(); return ok; }, reset: function () { mem = def(); save(); }, replace: function (o) { mem = o; load(); save(); } };
+})();
+
+/* ===== Hjelpere ===== */
+function $(id) { return document.getElementById(id); }
+function h(tag, attrs, kids) {
+  var e = document.createElement(tag);
+  if (attrs) for (var k in attrs) { if (k === 'class') e.className = attrs[k]; else if (k === 'text') e.textContent = attrs[k]; else if (k === 'html') e.innerHTML = attrs[k]; else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), attrs[k]); else e.setAttribute(k, attrs[k]); }
+  (kids || []).forEach(function (c) { if (c != null) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+  return e;
+}
+function toast(msg, ms) { var t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove('show'); }, ms || 2600); }
+function winPct(cp) { return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1); }
+function evWin(ev) { if (!ev) return 50; if (ev.mate != null) return ev.mate > 0 ? 100 : ev.mate < 0 ? 0 : (ev.mateFor === 'w' ? 100 : 0); return winPct(ev.cp); }
+function evText(ev) {
+  if (!ev) return '';
+  if (ev.mate != null) { if (ev.mate === 0) return ev.mateFor === 'w' ? '1-0' : '0-1'; return (ev.mate > 0 ? '' : '-') + 'M' + Math.abs(ev.mate); }
+  var v = ev.cp / 100; return (v > 0 ? '+' : '') + v.toFixed(Math.abs(v) >= 10 ? 0 : 1);
+}
+function evNum(ev) { if (!ev) return 0; if (ev.mate != null) return ev.mate > 0 || (ev.mate === 0 && ev.mateFor === 'w') ? 100000 - Math.abs(ev.mate) : -100000 + Math.abs(ev.mate); return ev.cp; }
+function uciToSanLine(fen, ucis, max) {
+  var g = new Chess.Game(fen), out = [];
+  for (var i = 0; i < ucis.length && i < (max || 99); i++) { var r = g.moveUci(ucis[i]); if (!r) break; out.push(r.san); }
+  return out;
+}
+function sanLineText(fen, sans) {
+  var p = new Chess.Pos(fen), n = p.full, t = p.turn, s = '';
+  for (var i = 0; i < sans.length; i++) { if (t === 0) s += n + '. '; else if (i === 0) s += n + '... '; s += sans[i] + ' '; if (t === 1) n++; t ^= 1; }
+  return s.trim();
+}
+var Sound = (function () {
+  var ctx = null;
+  function beep(freq, dur, vol, type) {
+    if (!Store.get().settings.sound) return;
+    try {
+      ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+      var o = ctx.createOscillator(), g = ctx.createGain(); o.type = type || 'triangle'; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol || .18, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+      o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + dur);
+    } catch (e) { }
+  }
+  return { move: function () { beep(420, .08, .2, 'square'); }, capture: function () { beep(250, .12, .25, 'square'); }, check: function () { beep(700, .15, .15); }, good: function () { beep(660, .1); setTimeout(function () { beep(880, .15); }, 90); }, bad: function () { beep(200, .25, .2, 'sawtooth'); }, end: function () { beep(523, .15); setTimeout(function () { beep(392, .3); }, 150); } };
+})();
+function playSound(rec, g) { if (!rec) return; if (rec.san.indexOf('#') >= 0 || rec.san.indexOf('+') >= 0) Sound.check(); else if (rec.capture) Sound.capture(); else Sound.move(); }
+
+/* ===== Åpningsbok ===== */
+var Openings = (function () {
+  var byKey = {}, bookKeys = {};
+  OPENINGS.forEach(function (o) {
+    var g = new Chess.Game(); var ok = true;
+    o[2].split(' ').forEach(function (s) { if (ok && !g.moveSan(s)) ok = false; bookKeys[g.pos.key()] = 1; });
+    if (ok) { var k = g.pos.key(), prev = byKey[k]; if (!prev || prev.moves.length > o[2].length) byKey[k] = { eco: o[0], name: o[1], moves: o[2] }; }
+  });
+  function keyOf(fen) { return fen.split(' ').slice(0, 4).join(' '); }
+  return {
+    count: OPENINGS.length,
+    // returns {eco,name,ply} best (deepest) match for list of fens (after each move)
+    detect: function (fens, upto) {
+      var best = null, n = Math.min(fens.length, upto == null ? fens.length : upto);
+      for (var i = 0; i < n; i++) { var o = byKey[keyOf(fens[i])]; if (o) best = { eco: o.eco, name: o.name, ply: i + 1 }; }
+      return best;
+    },
+    isBook: function (fen) { return !!bookKeys[keyOf(fen)]; }
+  };
+})();
+/* ===== Motorhåndtering (Stockfish med innebygd reserve) ===== */
+var Engine = (function () {
+  var SF_URLS = ['https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js', 'https://unpkg.com/stockfish.js@10.0.2/stockfish.js', 'https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js'];
+  var E = { kind: null, name: 'Laster motor…', listeners: [], chain: Promise.resolve(), gen: 0, onStatus: null };
+  var w = null, lineHandler = null;
+  function idb() { return new Promise(function (res, rej) { try { var r = indexedDB.open('sjakkstudio', 1); r.onupgradeneeded = function () { r.result.createObjectStore('files'); }; r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; } catch (e) { rej(e); } }); }
+  function idbGet(k) { return idb().then(function (db) { return new Promise(function (res) { var t = db.transaction('files').objectStore('files').get(k); t.onsuccess = function () { res(t.result || null); }; t.onerror = function () { res(null); }; }); }).catch(function () { return null; }); }
+  function idbPut(k, v) { return idb().then(function (db) { return new Promise(function (res) { var t = db.transaction('files', 'readwrite'); t.objectStore('files').put(v, k); t.oncomplete = function () { res(true); }; t.onerror = function () { res(false); }; }); }).catch(function () { return false; }); }
+  function fetchSF() {
+    var i = 0;
+    function next() {
+      if (i >= SF_URLS.length) return Promise.reject(new Error('ingen kilde'));
+      var u = SF_URLS[i++];
+      return fetch(u, { cache: 'force-cache' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (t) { if (t.length < 100000) throw new Error('for liten'); return t; }).catch(function () { return next(); });
+    }
+    return next();
+  }
+  function onLine(l) { if (lineHandler) lineHandler(l); }
+  function startWorkerFromText(text, timeoutMs) {
+    return new Promise(function (res, rej) {
+      var wk;
+      try { wk = new Worker(URL.createObjectURL(new Blob([text], { type: 'application/javascript' }))); } catch (e) { return rej(e); }
+      var done = false, to = setTimeout(function () { if (!done) { done = true; try { wk.terminate(); } catch (e) { } rej(new Error('timeout')); } }, timeoutMs || 20000);
+      wk.onmessage = function (e) {
+        var data = typeof e.data === 'string' ? e.data : (e.data && e.data.data) || '';
+        String(data).split('\n').forEach(function (l) {
+          if (!done && l.indexOf('uciok') === 0) { done = true; clearTimeout(to); wk.onmessage = function (ev) { String(typeof ev.data === 'string' ? ev.data : '').split('\n').forEach(onLine); }; res(wk); }
+        });
+      };
+      wk.onerror = function (er) { if (!done) { done = true; clearTimeout(to); rej(er); } };
+      wk.postMessage('uci');
+    });
+  }
+  function useInternal() {
+    var src = document.getElementById('core-src').textContent;
+    return startWorkerFromText(src, 5000).then(function (wk) { w = wk; E.kind = 'internal'; E.name = 'Innebygd motor'; })
+      .catch(function () {
+        var eng = MiniEngine.create(function (l) { onLine(l); });
+        w = { postMessage: function (c) { eng.postMessage(c); }, terminate: function () { } };
+        E.kind = 'internal'; E.name = 'Innebygd motor';
+      });
+  }
+  function status() { if (E.onStatus) E.onStatus(); }
+  E.init = function (force) {
+    var pref = Store.get().settings.engine;
+    if (w && w.terminate) try { w.terminate(); } catch (e) { }
+    w = null; E.kind = null; E.name = 'Laster motor…'; status();
+    E.ready = (pref === 'internal' ? Promise.reject('internal') : idbGet('stockfish').then(function (cached) {
+      if (cached) return cached;
+      if (!navigator.onLine && !force) throw new Error('offline');
+      return fetchSF().then(function (t) { return idbPut('stockfish', t).then(function () { E.cached = true; return t; }); });
+    }).then(function (text) { E.cached = true; return startWorkerFromText(text, 25000); }).then(function (wk) {
+      w = wk; E.kind = 'stockfish'; E.name = 'Stockfish 10';
+    })).catch(function () { return useInternal(); }).then(function () { w.postMessage('isready'); status(); });
+    return E.ready;
+  };
+  E.download = function () { return fetchSF().then(function (t) { return idbPut('stockfish', t); }).then(function (ok) { E.cached = ok; return ok; }); };
+  E.isCached = function () { return idbGet('stockfish').then(function (t) { E.cached = !!t; return !!t; }); };
+  E.cancel = function () { E.gen++; if (E.busy && w) w.postMessage('stop'); };
+  // opts: {depth, movetime, multipv}; returns {lines:[{uci,cp,mate,pv}], depth} — scores from WHITE's perspective
+  E.analyze = function (fen, opts, onProgress) {
+    var myGen = E.gen;
+    var job = function () {
+      if (myGen !== E.gen) return Promise.resolve(null);
+      return new Promise(function (res) {
+        var lines = {}, depth = 0, blackToMove = fen.split(' ')[1] === 'b';
+        E.busy = true;
+        lineHandler = function (l) {
+          if (l.indexOf('info') === 0 && l.indexOf(' pv ') > 0 && l.indexOf('score') > 0) {
+            var m = /depth (\d+)/.exec(l), mp = /multipv (\d+)/.exec(l), sc = /score (cp|mate) (-?\d+)/.exec(l), pv = / pv (.+)$/.exec(l);
+            if (!m || !sc || !pv) return;
+            if (/ (lowerbound|upperbound)/.test(l)) return;
+            var d = +m[1], k = mp ? +mp[1] : 1, val = +sc[2], sign = blackToMove ? -1 : 1;
+            var ent = { uci: pv[1].split(' ')[0], pv: pv[1].trim().split(' '), depth: d };
+            if (sc[1] === 'cp') ent.cp = val * sign; else { ent.mate = val * sign; if (val === 0) ent.mateFor = blackToMove ? 'w' : 'b'; }
+            lines[k] = ent; depth = Math.max(depth, d);
+            if (onProgress && k === 1) onProgress(ent, d);
+          } else if (l.indexOf('bestmove') === 0) {
+            lineHandler = null; E.busy = false;
+            var arr = Object.keys(lines).map(Number).sort(function (a, b) { return a - b; }).map(function (k) { return lines[k]; });
+            var bm = l.split(' ')[1];
+            if (!arr.length && bm && bm !== '(none)') arr = [{ uci: bm, pv: [bm], cp: 0 }];
+            res(myGen === E.gen ? { lines: arr, depth: depth, best: bm } : null);
+          }
+        };
+        w.postMessage('setoption name MultiPV value ' + (opts.multipv || 1));
+        w.postMessage('position fen ' + fen);
+        var cmd = 'go';
+        if (opts.depth) cmd += ' depth ' + opts.depth;
+        if (opts.movetime) cmd += ' movetime ' + opts.movetime;
+        w.postMessage(cmd);
+      });
+    };
+    var prev = E.chain;
+    var p = E.ready.then(function () { return prev; }).then(job, job);
+    E.chain = p.catch(function () { });
+    return p;
+  };
+  return E;
+})();
+/* ===== Felles brettvisning ===== */
+var B, App = { mode: null, modes: {} };
+var CLS = {
+  brilliant: { n: 'Brilliant', no: 'Briljant trekk', ic: '!!', c: '#26c2a3' },
+  great: { n: 'Great', no: 'Flott trekk', ic: '!', c: '#749bbf' },
+  best: { n: 'Best', no: 'Beste trekk', ic: '\u2605', c: '#81b64c' },
+  excellent: { n: 'Excellent', no: 'Utmerket', ic: '\u2713\u2713', c: '#96bc4b' },
+  good: { n: 'Good', no: 'Bra', ic: '\u2713', c: '#95af8a' },
+  book: { n: 'Book', no: 'Bok-trekk (åpningsteori)', ic: '\u2261', c: '#a88865' },
+  inaccuracy: { n: 'Inaccuracy', no: 'Unøyaktighet', ic: '?!', c: '#f0c15c' },
+  mistake: { n: 'Mistake', no: 'Feil', ic: '?', c: '#e6912c' },
+  miss: { n: 'Miss', no: 'Bom – tapt sjanse', ic: '\u2717', c: '#ee6b55' },
+  blunder: { n: 'Blunder', no: 'Tabbe', ic: '??', c: '#ca3431' }
+};
+var CLS_ORDER = ['brilliant', 'great', 'best', 'excellent', 'good', 'book', 'inaccuracy', 'mistake', 'miss', 'blunder'];
+function icon(cls, big) { var c = CLS[cls]; var s = h('span', { class: 'ic' + (big ? ' big' : ''), text: c.ic, title: c.n + ' – ' + c.no }); s.style.background = c.c; return s; }
+function hexA(hex, a) { var n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
+function kingSq(pos, color) { return Chess.sqName(pos.kings[color === 'w' ? 0 : 1]); }
+function showPosition(fen, opts) {
+  opts = opts || {}; var pos = new Chess.Pos(fen);
+  B.setPosition(pos.board(), { animate: opts.animate !== false, move: opts.move, instant: opts.instant });
+  var marks = opts.marks || {};
+  if (pos.inCheck()) marks.check = kingSq(pos, pos.turn ? 'b' : 'w');
+  B.setMarks(marks);
+  updateCaptured(pos);
+}
+function setEvalBar(ev, visible) {
+  var bar = $('evalbar'); bar.classList.toggle('hidden-bar', visible === false); bar.classList.toggle('flipped', !!B.flipped);
+  var w = ev ? evWin(ev) : 50; bar.querySelector('.fill').style.height = w + '%';
+  var lbl = bar.querySelector('.lbl'), whiteAhead = ev ? evNum(ev) >= 0 : true;
+  lbl.textContent = ev ? evText(ev).replace('+', '') : '';
+  var whiteAtBottom = !B.flipped;
+  lbl.className = 'lbl ' + ((whiteAhead === whiteAtBottom) ? 'at-bottom' : 'at-top');
+  lbl.style.color = whiteAhead ? '#333' : '#fff';
+  bar.title = ev ? (evText(ev) + ' (' + (whiteAhead ? 'hvit' : 'svart') + ' leder)') : '';
+}
+function setBars(top, bottom) {
+  [['topBar', top], ['botBar', bottom]].forEach(function (x) {
+    var el = $(x[0]); el.innerHTML = ''; var i = x[1]; if (!i) return;
+    el.appendChild(h('div', { class: 'avatar', text: i.avatar || (i.color === 'w' ? '\u2654' : '\u265A') }));
+    el.appendChild(h('div', {}, [h('span', { class: 'pname', text: i.name }), i.rating ? h('span', { class: 'prating', text: ' (' + i.rating + ')' }) : null]));
+    el.appendChild(h('span', { class: 'captured-list', id: x[0] + '-cap', 'data-color': i.color }));
+    el.appendChild(h('div', { class: 'grow' }));
+    if (i.extra) el.appendChild(i.extra);
+  });
+}
+function updateCaptured(pos) {
+  var cnt = { w: { p: 0, n: 0, b: 0, r: 0, q: 0 }, b: { p: 0, n: 0, b: 0, r: 0, q: 0 } }, arr = pos.board();
+  arr.forEach(function (p) { if (p && p[1] !== 'k') cnt[p[0]][p[1]]++; });
+  var init = { p: 8, n: 2, b: 2, r: 2, q: 1 }, val = { p: 1, n: 3, b: 3, r: 5, q: 9 }, mat = { w: 0, b: 0 };
+  ['w', 'b'].forEach(function (c) { for (var k in cnt[c]) mat[c] += cnt[c][k] * val[k]; });
+  ['topBar-cap', 'botBar-cap'].forEach(function (id) {
+    var el = $(id); if (!el) return; var c = el.getAttribute('data-color'), o = c === 'w' ? 'b' : 'w', s = '';
+    ['q', 'r', 'b', 'n', 'p'].forEach(function (k) { var missing = Math.max(0, init[k] - cnt[o][k]); for (var i = 0; i < missing; i++) s += GLYPH[k] + VS; });
+    var diff = mat[c] - mat[o]; el.textContent = s + (diff > 0 ? '  +' + diff : '');
+  });
+}
+function switchMode(m) {
+  if (App.mode === m) return;
+  if (App.mode && App.modes[App.mode].leave) App.modes[App.mode].leave();
+  App.mode = m;
+  document.querySelectorAll('.nav button').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === m); });
+  document.querySelectorAll('.tab').forEach(function (t) { t.classList.toggle('active', t.id === 'tab-' + m); });
+  B.select(null); var old = B.el.querySelector('.overlay-msg'); if (old) old.remove();
+  if (App.modes[m] && App.modes[m].enter) App.modes[m].enter();
+}
+
+/* ===== Analyse ===== */
+var Analysis = (function () {
+  var A = { game: null, fens: [], idx: 0, evals: [], cls: [], loss: [], running: false, explore: null };
+  var EXAMPLE = '[Event "Paris Opera"]\n[Site "Paris FRA"]\n[Date "1858.??.??"]\n[White "Paul Morphy"]\n[Black "Duke Karl / Count Isouard"]\n[Result "1-0"]\n\n1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8# 1-0';
+  function load(pgn, silent) {
+    var g;
+    try { g = Chess.parsePgn(pgn); } catch (e) { toast('Kunne ikke lese PGN: ' + e.message, 5000); return false; }
+    if (!g.moves.length) { toast('Fant ingen trekk i PGN-teksten.'); return false; }
+    Engine.cancel(); A.running = false;
+    A.game = g; A.fens = [g.startFen].concat(g.moves.map(function (m) { return m.fen; }));
+    A.evals = []; A.cls = []; A.loss = []; A.idx = 0; A.explore = null;
+    Store.get().lastPgn = pgn; Store.save();
+    $('an-progress').style.width = '0%'; $('an-summary').style.display = 'none'; $('an-status').textContent = '';
+    renderHeader(); renderMoves(); renderGraph(); go(0, false);
+    if (!silent) toast('Partiet er lastet inn – ' + g.moves.length + ' halvtrekk.');
+    return true;
+  }
+  function renderHeader() {
+    var hd = A.game.headers;
+    var op = Openings.detect(A.fens.slice(1));
+    var oe = $('an-opening'); oe.innerHTML = '';
+    if (op) { oe.appendChild(h('span', { class: 'eco', text: op.eco })); oe.appendChild(h('span', { text: op.name })); }
+    else oe.appendChild(h('span', { class: 'muted', text: A.game.startFen !== Chess.START ? 'Egen startstilling' : 'Ukjent åpning' }));
+    A.opening = op;
+    if (App.mode === 'analyse') bars();
+  }
+  function bars() {
+    if (!A.game) { setBars({ name: 'Svart', color: 'b' }, { name: 'Hvit', color: 'w' }); return; }
+    var hd = A.game.headers, wI = { name: hd.White || 'Hvit', rating: hd.WhiteElo, color: 'w' }, bI = { name: hd.Black || 'Svart', rating: hd.BlackElo, color: 'b' };
+    if (B.flipped) setBars(wI, bI); else setBars(bI, wI);
+    if (A.fens.length) updateCaptured(new Chess.Pos(curFen()));
+  }
+  function curFen() { return A.explore ? A.explore.game.fen() : A.fens[A.idx]; }
+  function moveClass(i) { return A.cls[i] || null; }
+  function renderMoves() {
+    var box = $('an-moves'); box.innerHTML = '';
+    if (!A.game) return;
+    var p = new Chess.Pos(A.game.startFen), num = p.full, t = p.turn;
+    if (t === 1) { box.appendChild(h('div', { class: 'num', text: num + '.' })); box.appendChild(h('div', { class: 'mv muted', text: '…' })); }
+    A.game.moves.forEach(function (m, i) {
+      if (t === 0) box.appendChild(h('div', { class: 'num', text: num + '.' }));
+      var c = moveClass(i), cell = h('div', { class: 'mv' + (A.idx === i + 1 && !A.explore ? ' cur' : ''), 'data-i': i + 1 });
+      if (c) cell.appendChild(icon(c));
+      cell.appendChild(document.createTextNode(m.san));
+      cell.addEventListener('click', function () { exitExplore(); go(i + 1, Math.abs(A.idx - (i + 1)) === 1); });
+      box.appendChild(cell);
+      if (t === 1) num++; t ^= 1;
+    });
+    var cur = box.querySelector('.cur'); if (cur) { var top = cur.offsetTop - box.offsetTop; if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 30) box.scrollTop = top - 60; }
+  }
+  function go(i, animate) {
+    if (!A.game) return;
+    i = Math.max(0, Math.min(A.fens.length - 1, i));
+    var prev = A.idx; A.idx = i;
+    var mv = null;
+    if (animate !== false && i === prev + 1) mv = { from: A.game.moves[i - 1].from, to: A.game.moves[i - 1].to };
+    else if (animate !== false && i === prev - 1) mv = { from: A.game.moves[i].to, to: A.game.moves[i].from };
+    var marks = {}, c = i > 0 ? moveClass(i - 1) : null;
+    if (i > 0) {
+      var m = A.game.moves[i - 1]; marks.last = [m.from, m.to];
+      if (c) { marks.lastColor = hexA(CLS[c].c, .5); marks.badge = { sq: m.to, color: CLS[c].c, icon: CLS[c].ic }; }
+      var ev0 = A.evals[i - 1];
+      if (c && ['best', 'brilliant', 'great', 'book'].indexOf(c) < 0 && ev0 && ev0.best && ev0.best.uci) marks.arrows = [{ from: ev0.best.uci.slice(0, 2), to: ev0.best.uci.slice(2, 4), color: 'rgba(129,182,76,.9)' }];
+    }
+    showPosition(A.fens[i], { animate: animate !== false && Math.abs(i - prev) <= 1, move: mv, marks: marks });
+    if (mv && animate !== false && i > prev) playSound(A.game.moves[i - 1]);
+    var ev = A.evals[i]; setEvalBar(ev ? ev.best : null, true);
+    renderMoves(); renderComment(); renderGraph();
+  }
+  function renderComment() {
+    var box = $('an-comment'); box.innerHTML = '';
+    if (A.explore) {
+      var ex = A.explore, sans = ex.game.moves.map(function (m) { return m.san; });
+      box.appendChild(h('div', { class: 'txt' }, [h('b', { text: 'Utforsker variant' }), h('div', { class: 'small muted', text: sanLineText(A.fens[ex.base], sans) || '–' }), h('div', { class: 'small', id: 'an-explore-ev', text: ex.evText || 'Beregner…' })]));
+      return;
+    }
+    if (A.idx === 0) { box.appendChild(h('div', { class: 'txt' }, [h('b', { text: 'Startstilling' }), h('div', { class: 'small muted', text: 'Bruk pilene (eller ← →) for å bla gjennom partiet.' })])); return; }
+    var i = A.idx - 1, m = A.game.moves[i], c = moveClass(i);
+    var parts = [];
+    if (c) {
+      var t = h('div', { class: 'txt' });
+      var ev = A.evals[i + 1] && A.evals[i + 1].best;
+      var head = h('b', { text: m.san + ' er ' + (c === 'book' ? 'et bok-trekk' : CLS[c].n) }); head.style.color = CLS[c].c;
+      t.appendChild(head);
+      t.appendChild(h('div', { class: 'small muted', text: CLS[c].no + (ev ? '  ·  Evaluering: ' + evText(ev) : '') }));
+      var e0 = A.evals[i];
+      if (e0 && e0.best && ['best', 'book', 'brilliant', 'great'].indexOf(c) < 0) {
+        var bs = uciToSanLine(A.fens[i], e0.best.pv || [e0.best.uci], 6);
+        if (bs.length) t.appendChild(h('div', { class: 'small', text: 'Beste var ' + bs[0] + ' (' + evText(e0.best) + ')  ·  ' + sanLineText(A.fens[i], bs) }));
+      } else if (e0 && e0.best && c !== 'book') {
+        var bs2 = uciToSanLine(A.fens[i], e0.best.pv || [], 6);
+        if (bs2.length > 1) t.appendChild(h('div', { class: 'small muted', text: 'Linje: ' + sanLineText(A.fens[i], bs2) }));
+      }
+      box.appendChild(icon(c, true)); box.appendChild(t);
+    } else {
+      box.appendChild(h('div', { class: 'txt' }, [h('b', { text: (m.color === 'w' ? 'Hvit' : 'Svart') + ' spilte ' + m.san }), h('div', { class: 'small muted', text: A.running ? 'Analyserer…' : 'Trykk «Analyser partiet» for å få vurdering av trekkene.' })]));
+    }
+  }
+  function renderGraph() {
+    var svg = $('an-graph'); var W = 400, H = 90; while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var NS = 'http://www.w3.org/2000/svg', n = A.fens.length - 1; if (n < 1) return;
+    var pts = [];
+    for (var k = 0; k <= n; k++) { var e = A.evals[k]; if (!e) break; pts.push([k / n * W, (100 - evWin(e.best)) / 100 * H]); }
+    var mid = document.createElementNS(NS, 'line'); mid.setAttribute('x1', 0); mid.setAttribute('x2', W); mid.setAttribute('y1', H / 2); mid.setAttribute('y2', H / 2); mid.setAttribute('stroke', '#777'); mid.setAttribute('stroke-width', '.5'); svg.appendChild(mid);
+    if (pts.length > 1) {
+      var poly = document.createElementNS(NS, 'polygon');
+      poly.setAttribute('points', '0,' + H + ' ' + pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ') + ' ' + pts[pts.length - 1][0].toFixed(1) + ',' + H);
+      poly.setAttribute('fill', '#f2f2f2'); svg.appendChild(poly);
+    }
+    for (k = 0; k < n; k++) {
+      var c = A.cls[k]; if (!c || ['blunder', 'mistake', 'miss', 'brilliant', 'great'].indexOf(c) < 0 || !pts[k + 1]) continue;
+      var ci = document.createElementNS(NS, 'circle'); ci.setAttribute('cx', pts[k + 1][0]); ci.setAttribute('cy', pts[k + 1][1]); ci.setAttribute('r', 3.2); ci.setAttribute('fill', CLS[c].c); ci.setAttribute('stroke', '#222'); ci.setAttribute('stroke-width', '.6'); svg.appendChild(ci);
+    }
+    var cur = document.createElementNS(NS, 'line'), x = A.idx / n * W; cur.setAttribute('x1', x); cur.setAttribute('x2', x); cur.setAttribute('y1', 0); cur.setAttribute('y2', H); cur.setAttribute('stroke', '#81b64c'); cur.setAttribute('stroke-width', '1.5'); svg.appendChild(cur);
+  }
+  function terminalEval(fen) {
+    var g = new Chess.Game(fen), st = g.status(); if (!st.over || st.reason === 'trekkgjentakelse') return null;
+    if (st.reason === 'sjakkmatt') return { best: { mate: 0, mateFor: st.result === '1-0' ? 'w' : 'b', uci: null, pv: [] }, terminal: true };
+    return { best: { cp: 0, uci: null, pv: [] }, terminal: true };
+  }
+  function moverWin(ev, color) { var w = evWin(ev); return color === 'w' ? w : 100 - w; }
+  var PV = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+  function isSacrifice(fen, uci) {
+    var g = new Chess.Game(fen), before = g.pos.pieceAt(uci.slice(2, 4)), mover = g.turn();
+    var rec = g.moveUci(uci); if (!rec) return false;
+    var pc = g.pos.pieceAt(rec.to); if (!pc || pc.type === 'p' || pc.type === 'k') return false;
+    var capVal = before ? PV[before.type] : 0, myVal = PV[pc.type];
+    var caps = g.legalMoves().filter(function (m) { return m.to === rec.to; });
+    if (!caps.length) return false;
+    var minAtt = 99; caps.forEach(function (m) { var a = g.pos.pieceAt(m.from); if (a) minAtt = Math.min(minAtt, PV[a.type] || 99); });
+    var defended = g.pos.attacked(Chess.sqIdx(rec.to), mover === 'w' ? 0 : 1);
+    var loss = defended ? Math.max(0, myVal - minAtt) : myVal;
+    return loss - capVal >= 2;
+  }
+  function classify(i) {
+    var e0 = A.evals[i], e1 = A.evals[i + 1]; if (!e0 || !e1) return;
+    var m = A.game.moves[i], col = m.color;
+    var bookSoFar = i === 0 || A.cls[i - 1] === 'book';
+    if (bookSoFar && i < 30 && Openings.isBook(A.fens[i + 1])) { A.cls[i] = 'book'; A.loss[i] = 0; return; }
+    var wBest = moverWin(e0.best, col), wAfter = moverWin(e1.best, col);
+    var isBest = e0.best.uci === m.uci;
+    if (isBest) wAfter = Math.max(wAfter, wBest);
+    var loss = Math.max(0, wBest - wAfter); A.loss[i] = loss;
+    var cls;
+    if (isBest || loss < 1) {
+      cls = 'best';
+      var second = e0.second;
+      var onlyOne = new Chess.Pos(A.fens[i]).legal().length <= 1;
+      if (onlyOne) cls = 'best';
+      else if (isBest && wAfter >= 45 && (wBest < 97 || (second && moverWin(second, col) < wBest - 10)) && isSacrifice(A.fens[i], m.uci)) cls = 'brilliant';
+      else if (isBest && second && wBest - moverWin(second, col) >= 18 && moverWin(second, col) < 85) cls = 'great';
+      if (!isBest && cls === 'best') cls = 'excellent';
+    }
+    else if (loss < 2.5) cls = 'excellent';
+    else if (loss < 6) cls = 'good';
+    else if (loss < 11) cls = 'inaccuracy';
+    else if (loss < 22) cls = 'mistake';
+    else cls = 'blunder';
+    var prevC = A.cls[i - 1];
+    if ((prevC === 'mistake' || prevC === 'blunder' || prevC === 'miss') && loss >= 8 && wBest >= 65 && cls !== 'blunder') cls = 'miss';
+    // a "blunder" when still completely winning is only an inaccuracy
+    if ((cls === 'blunder' || cls === 'mistake') && wAfter > 92) cls = 'inaccuracy';
+    A.cls[i] = cls;
+  }
+  function accuracy(color) {
+    var s = 0, n = 0;
+    A.game.moves.forEach(function (m, i) { if (m.color !== color || A.loss[i] == null) return; var l = A.loss[i]; s += Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * l) - 3.1669)); n++; });
+    return n ? s / n : null;
+  }
+  function renderSummary() {
+    var box = $('an-summary'); box.style.display = ''; box.innerHTML = '';
+    var hd = A.game.headers, aw = accuracy('w'), ab = accuracy('b');
+    box.appendChild(h('div', { class: 'acc' }, [
+      h('div', { class: 'box w' }, [h('div', { class: 'small muted', text: (hd.White || 'Hvit') }), h('b', { text: aw == null ? '–' : aw.toFixed(1) }), h('div', { class: 'small muted', text: 'Nøyaktighet' })]),
+      h('div', { class: 'box b' }, [h('div', { class: 'small muted', text: (hd.Black || 'Svart') }), h('b', { text: ab == null ? '–' : ab.toFixed(1) }), h('div', { class: 'small muted', text: 'Nøyaktighet' })])]));
+    var tb = h('table', { class: 'ctable' });
+    CLS_ORDER.forEach(function (k) {
+      var cw = 0, cb = 0; A.game.moves.forEach(function (m, i) { if (A.cls[i] === k) { if (m.color === 'w') cw++; else cb++; } });
+      var tdw = h('td', { class: 'n', text: String(cw) }), tdb = h('td', { class: 'n', text: String(cb) });
+      tdw.style.color = CLS[k].c; tdb.style.color = CLS[k].c;
+      tb.appendChild(h('tr', {}, [tdw, h('td', {}, [h('span', { class: 'row' }, [icon(k), h('span', { text: CLS[k].n + ' ', title: CLS[k].no }), h('span', { class: 'muted small', text: CLS[k].no })])]), tdb]));
+    });
+    box.appendChild(tb);
+  }
+  function settingsForDepth() {
+    var d = Store.get().settings.depth;
+    if (Engine.kind === 'stockfish') return d === 'fast' ? { depth: 10, movetime: 1200 } : d === 'deep' ? { depth: 18, movetime: 8000 } : { depth: 14, movetime: 3000 };
+    return { depth: d === 'fast' ? 5 : d === 'deep' ? 9 : 7, movetime: d === 'fast' ? 400 : d === 'deep' ? 2500 : 1000 };
+  }
+  function run() {
+    if (!A.game) { if (!load($('an-pgn').value)) return; }
+    if (A.running) return;
+    A.running = true; A.evals = []; A.cls = []; A.loss = [];
+    $('an-run').disabled = true; $('an-summary').style.display = 'none';
+    var n = A.fens.length, k = 0, t0 = Date.now(), myGame = A.game;
+    $('an-status').textContent = 'Starter motor…';
+    Engine.ready.then(function step() {
+      if (A.game !== myGame || !A.running) return;
+      if (k >= n) { A.running = false; $('an-run').disabled = false; $('an-status').textContent = 'Analyse ferdig (' + Engine.name + ', ' + Math.round((Date.now() - t0) / 1000) + ' s).'; renderSummary(); renderMoves(); renderComment(); renderGraph(); Sound.good(); return; }
+      var te = terminalEval(A.fens[k]);
+      var p = te ? Promise.resolve(te) : Engine.analyze(A.fens[k], Object.assign({ multipv: 2 }, settingsForDepth())).then(function (r) {
+        if (!r) return null; return { best: r.lines[0] || { cp: 0 }, second: r.lines[1] || null, depth: r.depth };
+      });
+      return p.then(function (ev) {
+        if (!ev || A.game !== myGame) { A.running = false; $('an-run').disabled = false; return; }
+        A.evals[k] = ev; if (k > 0) classify(k - 1);
+        $('an-progress').style.width = ((k + 1) / n * 100).toFixed(1) + '%';
+        $('an-status').textContent = 'Analyserer trekk ' + (k + 1) + ' av ' + n + ' med ' + Engine.name + '…';
+        if (!A.explore && App.mode === 'analyse' && (k === A.idx || k === A.idx - 1 + 1)) { go(A.idx, false); } else { renderMoves(); renderGraph(); if (!A.explore) renderComment(); }
+        k++; return step();
+      });
+    });
+  }
+  function exitExplore() { if (A.explore) { A.explore = null; if (!A.running) Engine.cancel(); $('an-back').style.display = 'none'; } }
+  function exploreMove(from, to, instant) {
+    var fen = curFen(), g0 = new Chess.Game(fen), needPromo = false;
+    var lm = g0.legalMoves().filter(function (m) { return m.from === from && m.to === to; }); if (!lm.length) return;
+    var pr = lm.length > 1 ? B.askPromotion(g0.turn()) : Promise.resolve(null);
+    pr.then(function (p) {
+      var uci = from + to + (p || '');
+      if (!A.explore && A.idx < A.fens.length - 1 && A.game.moves[A.idx].uci === uci) { go(A.idx + 1, !instant); if (instant) go(A.idx, false); return; }
+      if (!A.explore) A.explore = { base: A.idx, game: new Chess.Game(A.fens[A.idx]) };
+      var rec = A.explore.game.moveUci(uci); if (!rec) return; playSound(rec);
+      $('an-back').style.display = '';
+      showPosition(A.explore.game.fen(), { move: { from: rec.from, to: rec.to }, instant: instant, marks: { last: [rec.from, rec.to] } });
+      renderMoves(); evalExplore();
+    });
+  }
+  function evalExplore() {
+    var ex = A.explore; if (!ex) return; ex.evText = A.running ? 'Venter på at partianalysen blir ferdig…' : 'Beregner…'; renderComment(); if (!A.running) Engine.cancel();
+    var fen = ex.game.fen(), te = terminalEval(fen);
+    if (te) { setEvalBar(te.best, true); ex.evText = te.best.mate === 0 ? 'Sjakkmatt' : 'Remis'; renderComment(); return; }
+    Engine.analyze(fen, Engine.kind === 'stockfish' ? { depth: 14 } : { movetime: 700 }).then(function (r) {
+      if (!r || A.explore !== ex || ex.game.fen() !== fen) return;
+      var b = r.lines[0]; setEvalBar(b, true);
+      var sans = uciToSanLine(fen, b.pv, 5);
+      ex.evText = 'Evaluering ' + evText(b) + (sans.length ? ' · Beste: ' + sanLineText(fen, sans) : '');
+      renderComment();
+      B.patchMarks({ arrows: [{ from: b.uci.slice(0, 2), to: b.uci.slice(2, 4), color: 'rgba(129,182,76,.9)' }] });
+    });
+  }
+  function bindUi() {
+    $('an-load').addEventListener('click', function () { load($('an-pgn').value); });
+    $('an-run').addEventListener('click', function () { if (!A.game || Store.get().lastPgn !== $('an-pgn').value) { if (!load($('an-pgn').value, true)) return; } run(); });
+    $('an-example').addEventListener('click', function () { $('an-pgn').value = EXAMPLE; load(EXAMPLE); });
+    $('an-file').addEventListener('change', function (e) { var f = e.target.files[0]; if (!f) return; var r = new FileReader(); r.onload = function () { var t = String(r.result); var first = t.split(/\n\s*\n(?=\[Event)/)[0]; $('an-pgn').value = first; load(first); }; r.readAsText(f); });
+    $('an-first').addEventListener('click', function () { exitExplore(); go(0, false); });
+    $('an-prev').addEventListener('click', prev);
+    $('an-next').addEventListener('click', next);
+    $('an-last').addEventListener('click', function () { exitExplore(); go(A.fens.length - 1, false); });
+    $('an-flip').addEventListener('click', function () { B.setFlipped(!B.flipped); bars(); go(A.idx, false); });
+    $('an-back').addEventListener('click', function () { exitExplore(); go(A.idx, false); });
+    $('an-graph').addEventListener('click', function (e) { var r = e.currentTarget.getBoundingClientRect(); var n = A.fens.length - 1; if (n < 1) return; exitExplore(); go(Math.round((e.clientX - r.left) / r.width * n), false); });
+    $('an-depth').value = Store.get().settings.depth;
+    $('an-depth').addEventListener('change', function (e) { Store.get().settings.depth = e.target.value; Store.save(); });
+  }
+  function prev() {
+    if (A.explore) { var g = A.explore.game; if (g.moves.length > 1) { var last = g.undo(); showPosition(g.fen(), { move: { from: last.to, to: last.from }, marks: { last: g.moves.length ? [g.moves[g.moves.length - 1].from, g.moves[g.moves.length - 1].to] : [] } }); evalExplore(); return; } exitExplore(); go(A.idx, false); return; }
+    go(A.idx - 1);
+  }
+  function next() { if (A.explore) return; go(A.idx + 1); }
+  return {
+    A: A, load: load, bindUi: bindUi, prev: prev, next: next,
+    enter: function () {
+      B.movable = function (sq) { if (!A.game) return false; var pc = new Chess.Pos(curFen()).pieceAt(sq); return !!pc && pc.color === new Chess.Pos(curFen()).fen().split(' ')[1]; };
+      B.dests = function (sq) { if (!A.game) return []; return new Chess.Game(curFen()).legalMoves().filter(function (m) { return m.from === sq; }).map(function (m) { return m.to; }); };
+      B.onMove = exploreMove;
+      bars();
+      if (A.game) { if (A.explore) { showPosition(curFen(), { animate: false }); evalExplore(); } else go(A.idx, false); }
+      else { var pg = Store.get().lastPgn; $('an-pgn').value = pg || ''; if (!pg || !load(pg, true)) { showPosition(Chess.START, { animate: false }); setEvalBar(null, true); } }
+    },
+    leave: function () { },
+    key: function (e) { if (e.key === 'ArrowLeft') prev(); else if (e.key === 'ArrowRight') next(); else if (e.key === 'Home') { exitExplore(); go(0, false); } else if (e.key === 'End') { exitExplore(); go(A.fens.length - 1, false); } else return false; return true; }
+  };
+})();
+App.modes.analyse = Analysis;
+/* ===== Sjakknøtter ===== */
+var Puzzles = (function () {
+  var S = { cur: null, id: null, game: null, step: 0, failed: false, done: false, hint: 0, busy: false, lastDelta: null };
+  var THEME = { mateIn1: 'Matt i 1', mateIn2: 'Matt i 2', mateIn3: 'Matt i 3', mateIn4: 'Matt i 4', mateIn5: 'Matt i 5', material: 'Vinn materiell', sacrifice: 'Offer', quiet: 'Stille trekk', long: 'Lang kombinasjon' };
+  function st() { return Store.get().puzzle; }
+  function pRating(id) { var pr = st().pr[id]; return pr != null ? pr : PUZZLES[id].rating; }
+  function target() { return Math.round(st().rating + st().offset); }
+  function pick() {
+    var s = st(), t = target(), cand = [];
+    for (var i = 0; i < PUZZLES.length; i++) if (!s.attempted[i]) cand.push(i);
+    if (cand.length < 5) { s.attempted = {}; cand = PUZZLES.map(function (_, i) { return i; }); }
+    cand.sort(function (a, b) { return Math.abs(pRating(a) - t) - Math.abs(pRating(b) - t); });
+    var pool = cand.slice(0, 6); return pool[Math.floor(Math.random() * pool.length)];
+  }
+  function start(id) {
+    var o = B.el.querySelector('.overlay-msg'); if (o) o.remove();
+    S.id = id; S.cur = PUZZLES[id]; S.game = new Chess.Game(S.cur.fen); S.step = 0; S.failed = false; S.done = false; S.hint = 0; S.busy = true; S.lastDelta = null;
+    var player = S.game.turn() === 'w' ? 'b' : 'w'; S.player = player;
+    B.setFlipped(player === 'b');
+    setBars(null, null);
+    showPosition(S.cur.fen, { animate: false });
+    setEvalBar(null, false);
+    status('todo', 'Gjør deg klar…');
+    render();
+    setTimeout(function () { if (S.cur !== PUZZLES[id]) return; opponentMove(); S.busy = false; status('todo', (player === 'w' ? 'Hvit' : 'Svart') + ' i trekket – finn det beste trekket!'); }, 700);
+  }
+  function opponentMove() {
+    var u = S.cur.moves[S.step], rec = S.game.moveUci(u); S.step++;
+    playSound(rec); showPosition(S.game.fen(), { move: { from: rec.from, to: rec.to }, marks: { last: [rec.from, rec.to] } });
+  }
+  function status(kind, text) { var e = $('pz-status'); e.className = 'pz-status ' + kind; e.textContent = text; }
+  function result(ok) {
+    var s = st(), P = pRating(S.id), R = s.rating;
+    var E = 1 / (1 + Math.pow(10, (P - R) / 400));
+    var K = s.count < 20 ? 48 : 32, KL = K * 0.5;
+    var delta = ok ? Math.max(1, Math.round(K * (1 - E))) : -Math.max(1, Math.round(KL * E));
+    s.rating = Math.max(100, R + delta);
+    s.offset = ok ? Math.min(200, s.offset + 30) : Math.max(-200, s.offset - 15);
+    s.pr[S.id] = Math.round(P + 16 * ((ok ? 0 : 1) - (1 - E)));
+    s.attempted[S.id] = 1; s.count++; if (ok) { s.solved++; s.streak++; s.bestStreak = Math.max(s.bestStreak, s.streak); } else s.streak = 0;
+    s.history.push({ id: S.id, ok: ok, d: delta, r: s.rating, p: P, t: Date.now() }); if (s.history.length > 300) s.history.shift();
+    Store.save(); S.lastDelta = delta; render();
+  }
+  function userMove(from, to, instant) {
+    if (S.done || S.busy) return;
+    var lm = S.game.legalMoves().filter(function (m) { return m.from === from && m.to === to; }); if (!lm.length) return;
+    (lm.length > 1 ? B.askPromotion(S.game.turn()) : Promise.resolve(null)).then(function (p) {
+      var uci = from + to + (p || ''), expected = S.cur.moves[S.step];
+      var rec = S.game.moveUci(uci);
+      showPosition(S.game.fen(), { move: { from: from, to: to }, instant: instant, marks: { last: [from, to] } });
+      playSound(rec);
+      var mate = S.game.status().reason === 'sjakkmatt';
+      if (uci === expected || mate) {
+        S.step++;
+        B.patchMarks({ right: to });
+        if (S.step >= S.cur.moves.length || mate) { solved(); return; }
+        status('ok', 'Riktig! Fortsett…'); S.busy = true;
+        setTimeout(function () { opponentMove(); S.busy = false; status('todo', 'Riktig – finn neste trekk.'); }, Math.max(450, B.animMs()));
+      } else {
+        Sound.bad(); B.patchMarks({ wrong: to }); S.busy = true;
+        if (!S.failed) { S.failed = true; result(false); }
+        status('bad', 'Ikke riktig. Prøv igjen, eller trykk «Vis løsning».');
+        setTimeout(function () {
+          S.game.undo(); var last = S.game.moves[S.game.moves.length - 1];
+          showPosition(S.game.fen(), { move: { from: to, to: from }, marks: { last: last ? [last.from, last.to] : [] } }); S.busy = false;
+        }, 700 + B.animMs());
+      }
+    });
+  }
+  function solved() {
+    S.done = true; Sound.good();
+    if (!S.failed) { result(true); status('ok', 'Løst! Flott jobbet \u2714'); }
+    else status('ok', 'Løst – men med hjelp eller feil underveis.');
+    render();
+  }
+  function hint() {
+    if (S.done || S.busy || !S.cur) return;
+    var u = S.cur.moves[S.step]; S.hint++;
+    if (!S.failed) { S.failed = true; result(false); toast('Hint brukt – nøtten teller som ikke løst.'); }
+    if (S.hint === 1) B.patchMarks({ hint: u.slice(0, 2) });
+    else B.patchMarks({ hint: u.slice(0, 2), arrows: [{ from: u.slice(0, 2), to: u.slice(2, 4), color: 'rgba(80,160,255,.85)' }] });
+  }
+  function showSolution() {
+    if (S.done || !S.cur) return;
+    if (!S.failed) { S.failed = true; result(false); }
+    S.done = true; S.busy = true; status('bad', 'Løsningen vises…');
+    (function stepper() {
+      if (S.step >= S.cur.moves.length) { S.busy = false; status('bad', 'Slik var løsningen. Trykk «Neste nøtt» for en ny.'); render(); return; }
+      var u = S.cur.moves[S.step], rec = S.game.moveUci(u); S.step++; playSound(rec);
+      showPosition(S.game.fen(), { move: { from: rec.from, to: rec.to }, marks: { last: [rec.from, rec.to], arrows: [] } });
+      setTimeout(stepper, Math.max(800, B.animMs() + 400));
+    })();
+  }
+  function spark() {
+    var hs = st().history.slice(-40), svg = $('pz-spark'); while (svg.firstChild) svg.removeChild(svg.firstChild);
+    if (hs.length < 2) return;
+    var vals = hs.map(function (x) { return x.r; }), mn = Math.min.apply(null, vals) - 10, mx = Math.max.apply(null, vals) + 10, W = 300, H = 50;
+    var pl = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    pl.setAttribute('points', vals.map(function (v, i) { return (i / (vals.length - 1) * W).toFixed(1) + ',' + (H - (v - mn) / (mx - mn) * H).toFixed(1); }).join(' '));
+    pl.setAttribute('fill', 'none'); pl.setAttribute('stroke', '#81b64c'); pl.setAttribute('stroke-width', '2'); svg.appendChild(pl);
+  }
+  function render() {
+    var s = st();
+    $('pz-rating').textContent = Math.round(s.rating);
+    var d = $('pz-delta'); d.textContent = S.lastDelta == null ? '' : (S.lastDelta > 0 ? '+' + S.lastDelta : String(S.lastDelta)); d.className = 'delta ' + (S.lastDelta > 0 ? 'up' : 'down');
+    $('pz-prating').textContent = S.cur ? pRating(S.id) : '–';
+    $('pz-themes').textContent = S.cur && S.done ? (S.cur.themes || []).map(function (t) { return THEME[t] || t; }).join(' · ') : (S.cur ? 'Tema vises når nøtten er ferdig' : '');
+    $('pz-target').textContent = target();
+    $('pz-solved').textContent = s.solved + ' av ' + s.count + (s.count ? ' (' + Math.round(s.solved / s.count * 100) + ' %)' : '');
+    $('pz-streak').textContent = s.streak + ' (beste ' + s.bestStreak + ')';
+    $('pz-total').textContent = PUZZLES.length;
+    var dots = $('pz-dots'); dots.innerHTML = '';
+    s.history.slice(-24).forEach(function (x) { var sp = h('span', { title: (x.ok ? 'Løst' : 'Ikke løst') + ' – nøtt ' + x.p + ' (' + (x.d > 0 ? '+' : '') + x.d + ')' }); sp.style.background = x.ok ? '#81b64c' : '#ca3431'; dots.appendChild(sp); });
+    $('pz-hint').disabled = !S.cur || S.done; $('pz-retry').disabled = !S.cur || !(S.failed || S.done); $('pz-sol').disabled = !S.cur || S.done;
+    spark();
+  }
+  return {
+    bindUi: function () {
+      $('pz-next').addEventListener('click', function () { if (S.cur && !S.done && !S.failed && S.step > 0) { result(false); } start(pick()); });
+      $('pz-hint').addEventListener('click', hint);
+      $('pz-sol').addEventListener('click', showSolution);
+      $('pz-retry').addEventListener('click', function () { if (S.cur && (S.failed || S.done)) { start(S.id); S.failed = true; } });
+    },
+    enter: function () {
+      B.movable = function (sq) { if (!S.game || S.done || S.busy) return false; var pc = S.game.pos.pieceAt(sq); return !!pc && pc.color === S.player && S.game.turn() === S.player; };
+      B.dests = function (sq) { return S.game ? S.game.legalMoves().filter(function (m) { return m.from === sq; }).map(function (m) { return m.to; }) : []; };
+      B.onMove = userMove;
+      setBars(null, null); setEvalBar(null, false);
+      if (!S.cur) start(pick()); else { B.setFlipped(S.player === 'b'); showPosition(S.game.fen(), { animate: false }); render(); }
+    },
+    leave: function () { },
+    key: function () { return false; },
+    render: render
+  };
+})();
+App.modes.puzzle = Puzzles;
+/* ===== Spill mot bot ===== */
+var Play = (function () {
+  var BOTS = [
+    { n: 'Mia', r: 250, f: '\uD83D\uDC23', d: 'Har akkurat lært hvordan brikkene går.' },
+    { n: 'Ola', r: 500, f: '\uD83D\uDE42', d: 'Glad i å angripe – glemmer ofte å forsvare seg.' },
+    { n: 'Ingrid', r: 800, f: '\uD83E\uDDD2', d: 'Kjenner de vanligste åpningene.' },
+    { n: 'Lars', r: 1100, f: '\uD83E\uDDD4', d: 'Klubbspiller som liker taktikk.' },
+    { n: 'Kari', r: 1400, f: '\uD83D\uDC69', d: 'Solid og tålmodig.' },
+    { n: 'Sven', r: 1700, f: '\uD83E\uDDD1\u200D\uD83C\uDFEB', d: 'Erfaren turneringsspiller.' },
+    { n: 'Nora', r: 2000, f: '\uD83E\uDD8A', d: 'Ekspert – straffer de fleste feil.' },
+    { n: 'Mester Magnus', r: 2400, f: '\uD83D\uDC51', d: 'Internasjonal mester-nivå.' },
+    { n: 'Maskinen', r: 2800, f: '\uD83E\uDD16', d: 'Stormester-styrke.' },
+    { n: 'Stockfish Maks', r: 3200, f: '\uD83D\uDC1F', d: 'Full styrke. Lykke til!' }
+  ];
+  var G = { game: null, color: 'w', rating: 1200, bot: null, thinking: false, over: null, showEval: false, token: 0 };
+  function botFor(r) { var b = BOTS.filter(function (x) { return x.r === r; })[0]; return b || { n: 'Egendefinert bot', r: r, f: '\uD83C\uDFAF' }; }
+  function setupView(show) { $('pl-setup').style.display = show ? '' : 'none'; $('pl-game').style.display = show ? 'none' : ''; }
+  function renderBots() {
+    var box = $('pl-bots'); box.innerHTML = '';
+    var cur = Store.get().bot.lastRating;
+    BOTS.forEach(function (b) {
+      var st = Store.get().bot.stats[b.r], rec = st ? st.w + '/' + st.d + '/' + st.l : '';
+      var el = h('div', { class: 'bot' + (b.r === cur ? ' sel' : ''), title: b.d }, [h('div', { class: 'face', text: b.f }), h('div', { class: 'nm', text: b.n }), h('div', { class: 'rt', text: b.r + (rec ? ' · ' + rec : '') })]);
+      el.addEventListener('click', function () { Store.get().bot.lastRating = b.r; Store.save(); $('pl-range').value = b.r; $('pl-rv').textContent = b.r; renderBots(); });
+      box.appendChild(el);
+    });
+    $('pl-range').value = cur; $('pl-rv').textContent = cur;
+    var bt = botFor(+cur); $('pl-desc').textContent = bt.n + ' (' + cur + ')' + (bt.d ? ' – ' + bt.d : '');
+    document.querySelectorAll('#pl-color button').forEach(function (b) { b.classList.toggle('sel', b.dataset.c === Store.get().bot.lastColor); });
+  }
+  function newGame() {
+    var s = Store.get().bot, c = s.lastColor === 'r' ? (Math.random() < .5 ? 'w' : 'b') : s.lastColor;
+    G.token++; Engine.cancel();
+    G.game = new Chess.Game(); G.color = c; G.rating = +s.lastRating; G.bot = botFor(G.rating); G.over = null; G.thinking = false;
+    s.current = { rating: G.rating, color: c, moves: [], over: null };
+    Store.save();
+    setupView(false); enterBoard(true);
+    if (G.color !== G.game.turn()) setTimeout(botMove, 600);
+  }
+  function save() { var s = Store.get().bot; if (!G.game) return; s.current = { rating: G.rating, color: G.color, moves: G.game.moves.map(function (m) { return m.uci; }), over: G.over }; Store.save(); }
+  function restore() {
+    var c = Store.get().bot.current; if (!c) return false;
+    var g = new Chess.Game(); for (var i = 0; i < c.moves.length; i++) if (!g.moveUci(c.moves[i])) break;
+    G.game = g; G.color = c.color; G.rating = c.rating; G.bot = botFor(c.rating); G.over = c.over; return true;
+  }
+  function enterBoard(fresh) {
+    B.setFlipped(G.color === 'b');
+    var bot = { name: G.bot.n, rating: G.rating, avatar: G.bot.f, color: G.color === 'w' ? 'b' : 'w', extra: h('span', { id: 'pl-think', class: 'small muted' }) };
+    var me = { name: 'Du', avatar: '\uD83D\uDE0E', color: G.color };
+    setBars(bot, me);
+    var last = G.game.moves[G.game.moves.length - 1];
+    showPosition(G.game.fen(), { animate: false, marks: last ? { last: [last.from, last.to] } : {} });
+    setEvalBar(null, G.showEval); if (G.showEval) quickEval();
+    renderInfo();
+    if (G.over) showEnd();
+  }
+  function renderInfo() {
+    var box = $('pl-moves'); box.innerHTML = '';
+    var num = 1;
+    G.game.moves.forEach(function (m, i) {
+      if (i % 2 === 0) box.appendChild(h('div', { class: 'num', text: num + '.' }));
+      box.appendChild(h('div', { class: 'mv' + (i === G.game.moves.length - 1 ? ' cur' : ''), text: m.san }));
+      if (i % 2 === 1) num++;
+    });
+    box.scrollTop = box.scrollHeight;
+    var op = Openings.detect(G.game.moves.map(function (m) { return m.fen; }));
+    var oe = $('pl-opening'); oe.innerHTML = '';
+    if (op) { oe.appendChild(h('span', { class: 'eco', text: op.eco })); oe.appendChild(h('span', { text: op.name })); } else oe.appendChild(h('span', { class: 'muted', text: G.game.moves.length ? 'Ukjent åpning' : 'Åpningen vises her når partiet starter' }));
+    var t = $('pl-think'); if (t) t.innerHTML = G.thinking ? '<span class="thinking"></span> tenker…' : '';
+    $('pl-status').textContent = G.over ? ('Partiet er slutt: ' + G.over.text) : G.thinking ? G.bot.n + ' tenker…' : (G.game.turn() === G.color ? 'Din tur (' + (G.color === 'w' ? 'hvit' : 'svart') + ')' : '');
+    $('pl-undo').disabled = G.thinking || G.game.moves.length < 1 || !!G.over;
+    $('pl-hint').disabled = G.thinking || !!G.over;
+    $('pl-resign').disabled = !!G.over;
+  }
+  function botOpts(r) {
+    if (Engine.kind === 'stockfish') {
+      if (r >= 3000) return { movetime: 2500, multipv: 1 };
+      if (r >= 2600) return { depth: 18, movetime: 2500, multipv: 1 };
+      return { depth: Math.max(1, Math.min(16, Math.round((r - 250) / 160))), movetime: 2500, multipv: 4 };
+    }
+    return { depth: Math.max(1, Math.min(10, Math.round((r - 100) / 280))), movetime: r >= 2000 ? 2500 : 1200, multipv: r >= 2400 ? 1 : 4 };
+  }
+  function choose(res, r, fen) {
+    var g = new Chess.Game(fen), legal = g.legalMoves(), col = g.turn();
+    if (!res || !res.lines.length) return legal[Math.floor(Math.random() * legal.length)].uci;
+    var blunderP = Math.max(0, Math.min(0.3, (1500 - r) / 3500));
+    if (Math.random() < blunderP) return legal[Math.floor(Math.random() * legal.length)].uci;
+    var lines = res.lines, T = Math.max(0.25, Math.min(16, (2700 - r) / 110));
+    var wins = lines.map(function (l) { var w = evWin(l); return col === 'w' ? w : 100 - w; });
+    var best = Math.max.apply(null, wins), ws = wins.map(function (w) { return Math.exp(-(best - w) / T); });
+    var sum = ws.reduce(function (a, b) { return a + b; }, 0), x = Math.random() * sum;
+    for (var i = 0; i < ws.length; i++) { x -= ws[i]; if (x <= 0) return lines[i].uci; }
+    return lines[0].uci;
+  }
+  function botMove() {
+    if (!G.game || G.over || G.game.turn() === G.color) return;
+    var tok = G.token, fen = G.game.fen(), t0 = Date.now();
+    G.thinking = true; renderInfo();
+    Engine.analyze(fen, botOpts(G.rating)).then(function (res) {
+      if (tok !== G.token || G.game.fen() !== fen) return;
+      var uci = choose(res, G.rating, fen);
+      var wait = Math.max(0, 500 + Math.random() * 500 - (Date.now() - t0));
+      setTimeout(function () {
+        if (tok !== G.token || G.game.fen() !== fen) return;
+        G.thinking = false; applyMove(uci, false);
+      }, wait);
+    });
+  }
+  function applyMove(uci, instant) {
+    var rec = G.game.moveUci(uci); if (!rec) return;
+    playSound(rec);
+    showPosition(G.game.fen(), { move: { from: rec.from, to: rec.to }, instant: instant, marks: { last: [rec.from, rec.to] } });
+    var st = G.game.status();
+    if (st.over) endGame(st);
+    save(); renderInfo();
+    if (G.showEval) quickEval();
+    if (!G.over && G.game.turn() !== G.color) setTimeout(botMove, Math.max(150, B.animMs() * 0.6));
+  }
+  function endGame(st) {
+    var meW = G.color === 'w', res = st.result, text;
+    if (res === '1/2-1/2') text = 'Remis (' + st.reason + ')';
+    else { var iWon = (res === '1-0') === meW; text = (iWon ? 'Du vant' : G.bot.n + ' vant') + ' (' + st.reason + ')'; }
+    G.over = { result: res, text: text };
+    var s = Store.get().bot.stats; var k = G.rating; s[k] = s[k] || { w: 0, d: 0, l: 0 };
+    if (res === '1/2-1/2') s[k].d++; else if ((res === '1-0') === meW) s[k].w++; else s[k].l++;
+    save(); Sound.end(); setTimeout(showEnd, B.animMs() + 200);
+  }
+  function showEnd() {
+    var old = B.el.querySelector('.overlay-msg'); if (old) old.remove();
+    if (App.mode !== 'play' || !G.over) return;
+    var won = /^Du vant/.test(G.over.text), draw = G.over.result === '1/2-1/2';
+    var box = h('div', { class: 'overlay-msg' }, [h('h2', { text: won ? 'Du vant! \uD83C\uDF89' : draw ? 'Remis' : 'Du tapte' }), h('p', { text: G.over.text }),
+      h('div', { class: 'row', style: 'justify-content:center' }, [h('button', { class: 'btn primary', text: 'Analyser partiet', onclick: analyzeGame }), h('button', { class: 'btn', text: 'Ny kamp', onclick: function () { box.remove(); setupView(true); renderBots(); } }), h('button', { class: 'btn', text: 'Lukk', onclick: function () { box.remove(); } })])]);
+    B.el.appendChild(box);
+  }
+  function pgnOf() {
+    var g = G.game; var me = 'Du', bot = G.bot.n + ' (bot)';
+    g.headers = { Event: 'Parti mot bot', Site: 'Sjakkstudio', Date: new Date().toISOString().slice(0, 10).replace(/-/g, '.'), White: G.color === 'w' ? me : bot, Black: G.color === 'w' ? bot : me, Result: G.over ? G.over.result : '*' };
+    if (G.color === 'w') g.headers.BlackElo = String(G.rating); else g.headers.WhiteElo = String(G.rating);
+    return g.pgn();
+  }
+  function analyzeGame() {
+    if (!G.game || !G.game.moves.length) { toast('Ingen trekk å analysere ennå.'); return; }
+    var pgn = pgnOf(); switchMode('analyse'); $('an-pgn').value = pgn;
+    if (Analysis.load(pgn, true)) $('an-run').click();
+  }
+  function userMove(from, to, instant) {
+    if (G.over || G.thinking || G.game.turn() !== G.color) return;
+    var lm = G.game.legalMoves().filter(function (m) { return m.from === from && m.to === to; }); if (!lm.length) return;
+    (lm.length > 1 ? B.askPromotion(G.color) : Promise.resolve(null)).then(function (p) { applyMove(from + to + (p || ''), instant); });
+  }
+  function quickEval() {
+    var fen = G.game.fen(), tg = new Chess.Game(fen), st = tg.status();
+    if (st.over) { setEvalBar(st.reason === 'sjakkmatt' ? { mate: 0, mateFor: st.result === '1-0' ? 'w' : 'b' } : { cp: 0 }, G.showEval); return; }
+    Engine.analyze(fen, Engine.kind === 'stockfish' ? { depth: 11 } : { movetime: 300 }).then(function (r) { if (r && r.lines[0] && G.game.fen() === fen) setEvalBar(r.lines[0], G.showEval); });
+  }
+  return {
+    bindUi: function () {
+      $('pl-range').addEventListener('input', function (e) { var v = +e.target.value; Store.get().bot.lastRating = v; $('pl-rv').textContent = v; Store.save(); renderBots(); });
+      document.querySelectorAll('#pl-color button').forEach(function (b) { b.addEventListener('click', function () { Store.get().bot.lastColor = b.dataset.c; Store.save(); renderBots(); }); });
+      $('pl-start').addEventListener('click', newGame);
+      $('pl-new').addEventListener('click', function () { G.token++; G.thinking = false; Engine.cancel(); var o = B.el.querySelector('.overlay-msg'); if (o) o.remove(); setupView(true); renderBots(); });
+      $('pl-undo').addEventListener('click', function () {
+        if (G.thinking || G.over) return; G.token++;
+        var n = 0; do { if (!G.game.undo()) break; n++; } while (G.game.turn() !== G.color && G.game.moves.length);
+        if (G.game.turn() !== G.color) { setTimeout(botMove, 300); }
+        var last = G.game.moves[G.game.moves.length - 1];
+        showPosition(G.game.fen(), { marks: last ? { last: [last.from, last.to] } : {} }); save(); renderInfo(); if (G.showEval) quickEval();
+      });
+      $('pl-hint').addEventListener('click', function () {
+        if (G.thinking || G.over || G.game.turn() !== G.color) return;
+        var fen = G.game.fen(); $('pl-status').textContent = 'Leter etter beste trekk…';
+        Engine.analyze(fen, Engine.kind === 'stockfish' ? { depth: 14 } : { movetime: 1000 }).then(function (r) {
+          if (!r || !r.lines[0] || G.game.fen() !== fen) return; var u = r.lines[0].uci;
+          B.patchMarks({ arrows: [{ from: u.slice(0, 2), to: u.slice(2, 4), color: 'rgba(80,160,255,.85)' }] }); renderInfo();
+        });
+      });
+      $('pl-flip').addEventListener('click', function () { B.setFlipped(!B.flipped); var bot = { name: G.bot.n, rating: G.rating, avatar: G.bot.f, color: G.color === 'w' ? 'b' : 'w', extra: h('span', { id: 'pl-think', class: 'small muted' }) }, me = { name: 'Du', avatar: '\uD83D\uDE0E', color: G.color }; if (B.flipped === (G.color === 'b')) setBars(bot, me); else setBars(me, bot); updateCaptured(G.game.pos); setEvalBar(null, G.showEval); if (G.showEval) quickEval(); });
+      $('pl-resign').addEventListener('click', function (e) {
+        var b = e.currentTarget; if (G.over) return;
+        if (!b.dataset.confirm) { b.dataset.confirm = '1'; b.textContent = 'Bekreft: gi opp?'; setTimeout(function () { delete b.dataset.confirm; b.textContent = 'Gi opp'; }, 3000); return; }
+        delete b.dataset.confirm; b.textContent = 'Gi opp'; G.token++; G.thinking = false; Engine.cancel();
+        endGame({ result: G.color === 'w' ? '0-1' : '1-0', reason: 'du ga opp' }); renderInfo();
+      });
+      $('pl-analyze').addEventListener('click', analyzeGame);
+      $('pl-eval').addEventListener('change', function (e) { G.showEval = e.target.checked; setEvalBar(null, G.showEval); if (G.showEval && G.game) quickEval(); });
+    },
+    enter: function () {
+      B.movable = function (sq) { if (!G.game || G.over || G.thinking || G.game.turn() !== G.color) return false; var pc = G.game.pos.pieceAt(sq); return !!pc && pc.color === G.color; };
+      B.dests = function (sq) { return G.game ? G.game.legalMoves().filter(function (m) { return m.from === sq; }).map(function (m) { return m.to; }) : []; };
+      B.onMove = userMove;
+      if (!G.game && restore() && !G.over) { setupView(false); enterBoard(); if (G.game.turn() !== G.color) setTimeout(botMove, 500); return; }
+      if (G.game && !G.over && $('pl-setup').style.display === 'none') { enterBoard(); if (G.game.turn() !== G.color && !G.thinking) setTimeout(botMove, 400); return; }
+      setupView(true); renderBots();
+      setBars({ name: 'Velg motstander', color: 'b', avatar: '\uD83E\uDD16' }, { name: 'Du', color: 'w', avatar: '\uD83D\uDE0E' });
+      B.setFlipped(false); showPosition(Chess.START, { animate: false }); setEvalBar(null, false);
+    },
+    leave: function () { if (G.thinking) { G.token++; G.thinking = false; Engine.cancel(); } },
+    key: function () { return false; }
+  };
+})();
+App.modes.play = Play;
+/* ===== Innstillinger og oppstart ===== */
+var Settings = (function () {
+  function apply() {
+    var s = Store.get().settings;
+    document.documentElement.style.setProperty('--anim', s.anim + 'ms');
+    document.body.classList.toggle('nocoords', !s.coords);
+    document.body.classList.remove('theme-brown', 'theme-blue'); if (s.theme !== 'green') document.body.classList.add('theme-' + s.theme);
+  }
+  function engineInfo() {
+    var p = $('engine-pill'), s = $('st-engine');
+    var txt = Engine.kind === 'stockfish' ? 'Stockfish 10' : Engine.kind === 'internal' ? 'Innebygd motor' : 'Laster motor…';
+    p.textContent = '\u2699 ' + txt; p.className = 'pill ' + (Engine.kind === 'stockfish' ? 'ok' : Engine.kind ? 'warn' : '');
+    p.title = Engine.kind === 'stockfish' ? 'Stockfish kjører lokalt i nettleseren' + (Engine.cached ? ' og er lagret for offline-bruk' : '') : 'Stockfish er ikke tilgjengelig – bruker innebygd motor (fungerer helt offline)';
+    if (s) s.textContent = Engine.kind === 'stockfish' ? 'Stockfish 10 er aktiv' + (Engine.cached ? ' og lagret lokalt – fungerer uten nett.' : '.') : Engine.kind === 'internal' ? 'Innebygd motor er aktiv (ca. 1800–2000 i styrke). Stockfish lastes automatisk neste gang du er på nett.' : 'Starter…';
+  }
+  function net() { var p = $('net-pill'); var on = navigator.onLine; p.textContent = on ? '\u25CF Tilkoblet' : '\u25CF Offline-modus'; p.className = 'pill ' + (on ? 'ok' : 'off'); }
+  function bindUi() {
+    var s = Store.get().settings;
+    $('st-anim').value = s.anim; $('st-anim-v').textContent = s.anim + ' ms';
+    $('st-anim').addEventListener('input', function (e) { s.anim = +e.target.value; $('st-anim-v').textContent = s.anim + ' ms'; Store.save(); apply(); });
+    $('st-sound').checked = s.sound; $('st-sound').addEventListener('change', function (e) { s.sound = e.target.checked; Store.save(); });
+    $('st-coords').checked = s.coords; $('st-coords').addEventListener('change', function (e) { s.coords = e.target.checked; Store.save(); apply(); });
+    document.querySelectorAll('#st-theme button').forEach(function (b) { b.classList.toggle('sel', b.dataset.t === s.theme); b.addEventListener('click', function () { s.theme = b.dataset.t; Store.save(); apply(); document.querySelectorAll('#st-theme button').forEach(function (x) { x.classList.toggle('sel', x.dataset.t === s.theme); }); }); });
+    document.querySelectorAll('#st-eng button').forEach(function (b) { b.classList.toggle('sel', b.dataset.e === s.engine); b.addEventListener('click', function () { s.engine = b.dataset.e; Store.save(); document.querySelectorAll('#st-eng button').forEach(function (x) { x.classList.toggle('sel', x.dataset.e === s.engine); }); Engine.init(); }); });
+    $('st-dl').addEventListener('click', function () {
+      if (!navigator.onLine) { toast('Du er offline – koble til nettet for å laste ned Stockfish.'); return; }
+      $('st-dl').disabled = true; $('st-dl').textContent = 'Laster ned…';
+      Engine.download().then(function () { toast('Stockfish er lagret lokalt og virker nå uten nett.'); Store.get().settings.engine = 'auto'; Store.save(); return Engine.init(); })
+        .catch(function () { toast('Kunne ikke laste ned Stockfish (nettverket kan blokkere kilden). Den innebygde motoren brukes.', 5000); })
+        .then(function () { $('st-dl').disabled = false; $('st-dl').textContent = 'Last ned / oppdater Stockfish for offline'; engineInfo(); });
+    });
+    $('st-export').addEventListener('click', function () {
+      var blob = new Blob([JSON.stringify(Store.get(), null, 1)], { type: 'application/json' });
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sjakkstudio-data.json'; document.body.appendChild(a); a.click(); a.remove();
+    });
+    $('st-import').addEventListener('change', function (e) {
+      var f = e.target.files[0]; if (!f) return; var r = new FileReader();
+      r.onload = function () { try { var o = JSON.parse(r.result); if (!o.puzzle) throw 0; Store.replace(o); toast('Data importert.'); Puzzles.render(); apply(); } catch (er) { toast('Filen kunne ikke leses.'); } };
+      r.readAsText(f);
+    });
+    $('st-reset').addEventListener('click', function (e) {
+      var b = e.currentTarget; if (!b.dataset.c) { b.dataset.c = 1; b.textContent = 'Klikk igjen for å bekrefte'; setTimeout(function () { delete b.dataset.c; b.textContent = 'Nullstill nøtterating'; }, 3000); return; }
+      delete b.dataset.c; b.textContent = 'Nullstill nøtterating';
+      var d = Store.get(); d.puzzle = { rating: 800, count: 0, solved: 0, streak: 0, bestStreak: 0, offset: 0, history: [], attempted: {}, pr: {} }; Store.save(); Puzzles.render(); toast('Nøtteratingen er nullstilt til 800.');
+    });
+    $('st-storage').textContent = Store.ok() ? 'Ratinger, innstillinger og pågående parti lagres automatisk i nettleseren på denne maskinen.' : 'Nettleseren tillater ikke lokal lagring her. Åpne filen direkte i nettleseren (Edge/Chrome) for at ratingen skal huskes, eller bruk eksport/import.';
+    $('st-counts').textContent = Openings.count + ' åpninger i databasen · ' + PUZZLES.length + ' sjakknøtter innebygd';
+    window.addEventListener('online', net); window.addEventListener('offline', net);
+  }
+  return { apply: apply, bindUi: bindUi, engineInfo: engineInfo, net: net };
+})();
+App.modes.settings = { enter: function () { Settings.engineInfo(); }, key: function () { return false; } };
+
+document.addEventListener('DOMContentLoaded', function () {
+  try { start(); document.documentElement.classList.add('js-ok'); } catch (e) { window.__jsErr && window.__jsErr(e && e.message ? e.message : String(e)); }
+});
+function start() {
+  Store.get(); Settings.apply();
+  B = new Board($('board'));
+  B.onFlip = function () { };
+  Engine.onStatus = Settings.engineInfo;
+  Engine.init();
+  Analysis.bindUi(); Puzzles.bindUi(); Play.bindUi(); Settings.bindUi(); Settings.net();
+  document.querySelectorAll('.nav button').forEach(function (b) { b.addEventListener('click', function () { switchMode(b.dataset.tab); }); });
+  document.addEventListener('keydown', function (e) {
+    if (/INPUT|TEXTAREA|SELECT/.test((e.target.tagName || ''))) return;
+    var m = App.modes[App.mode]; if (m && m.key && m.key(e)) e.preventDefault();
+  });
+  switchMode('analyse');
+}
+
+</script>
+</body>
+</html>
